@@ -4,27 +4,29 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -34,7 +36,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
@@ -42,6 +43,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
+import java.util.Locale
 
 // --- DATA MODELS ---
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
@@ -63,9 +65,40 @@ data class ImgurPost(
 
     val isVideo: Boolean
         get() = (mainMedia?.type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true
+
+    val isGif: Boolean
+        get() = mainMedia?.type == "image/gif" || mediaUrl?.endsWith(".gif") == true
+
+    val sizeInBytes: Long
+        get() = mainMedia?.size ?: 0L
+
+    val formattedSize: String
+        get() {
+            if (sizeInBytes <= 0) return "unbekannt"
+            val kb = sizeInBytes / 1024.0
+            val mb = kb / 1024.0
+            return if (mb >= 1.0) {
+                String.format(Locale.US, "%.1f MB", mb)
+            } else {
+                String.format(Locale.US, "%.0f KB", kb)
+            }
+        }
+
+    val typeLabel: String
+        get() = when {
+            isVideo -> "🎥 MP4"
+            isGif -> "🎞️ GIF"
+            else -> "🖼️ BILD"
+        }
 }
 
-data class ImgurImage(val id: String, val link: String, val mp4: String?, val type: String?)
+data class ImgurImage(
+    val id: String,
+    val link: String,
+    val mp4: String?,
+    val type: String?,
+    val size: Long?
+)
 
 data class ImgurComment(
     val id: Long,
@@ -127,7 +160,6 @@ class ImgurViewModel : ViewModel() {
         loadViralPosts(isRefresh = true)
     }
 
-    // NEU: Unterstützung für Seiten-Pagination
     fun loadViralPosts(isRefresh: Boolean = false) {
         if (isLoadingMore) return
 
@@ -217,7 +249,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
     val pullToRefreshState = rememberPullToRefreshState()
     val gridState = rememberLazyGridState()
 
-    // Pull-to-Refresh: Setzt die Seiten zurück und lädt neu
     if (pullToRefreshState.isRefreshing) {
         LaunchedEffect(true) { viewModel.loadViralPosts(isRefresh = true) }
     }
@@ -226,7 +257,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
         if (!viewModel.isRefreshing) pullToRefreshState.endRefresh()
     }
 
-    // NEU: Erkennt, wenn der Nutzer das Ende der Liste erreicht hat und lädt die nächste Seite nach
     val shouldLoadMore = remember {
         derivedStateOf {
             val totalItems = gridState.layoutInfo.totalItemsCount
@@ -273,7 +303,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                     )
                 }
 
-                // Ladeindikator unten an der Liste anzeigen, wenn weitere Posts geladen werden
                 if (viewModel.isLoadingMore) {
                     item {
                         Box(
@@ -374,8 +403,6 @@ fun ManageBlacklistDialog(viewModel: ImgurViewModel, onDismiss: () -> Unit) {
 
 @Composable
 fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String) -> Unit) {
-    var isVisibleOnScreen by remember { mutableStateOf(false) }
-
     Card(
         modifier = Modifier
             .padding(4.dp)
@@ -388,28 +415,48 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
                     .fillMaxWidth()
                     .aspectRatio(1f)
             ) {
+                // 1. Thumbnail / Vorschaubild (Kein Autoplay)
+                AsyncImage(
+                    model = post.thumbnailUrl,
+                    contentDescription = post.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // 2. Play-Button Badge für Videos
                 if (post.isVideo) {
-                    Image(
-                        painter = rememberAsyncImagePainter(post.thumbnailUrl),
-                        contentDescription = post.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    DisposableEffect(post.id) {
-                        isVisibleOnScreen = true
-                        onDispose { isVisibleOnScreen = false }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color.Black.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = "▶",
+                                color = Color.White,
+                                fontSize = 20.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                            )
+                        }
                     }
+                }
 
-                    if (isVisibleOnScreen && post.mediaUrl != null) {
-                        VideoPlayer(videoUrl = post.mediaUrl!!, isMuted = true, modifier = Modifier.fillMaxSize())
-                    }
-                } else {
-                    AsyncImage(
-                        model = post.mediaUrl,
-                        contentDescription = post.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                // 3. Typ- & Größen-Badge oben links auf der Karte
+                Surface(
+                    shape = RoundedCornerShape(bottomEnd = 8.dp),
+                    color = Color.Black.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Text(
+                        text = "${post.typeLabel} • ${post.formattedSize}",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                     )
                 }
             }
@@ -445,6 +492,14 @@ fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss:
                 Text(
                     text = post.title, 
                     style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                // Größen- und Typanzeige in der Detailansicht
+                Text(
+                    text = "${post.typeLabel} • Dateigröße: ${post.formattedSize}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
@@ -551,7 +606,7 @@ fun VideoPlayer(videoUrl: String, isMuted: Boolean, modifier: Modifier = Modifie
         factory = { ctx ->
             PlayerView(ctx).apply {
                 player = exoPlayer
-                useController = false
+                useController = true // Mit Video-Play/Pause-Steuerung im Detailmenü
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
             }
         },
