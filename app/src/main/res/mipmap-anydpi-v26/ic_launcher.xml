@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dunkler Premium-Hintergrund -->
+    <background android:drawable="@android:color/background_dark" />
+    <!-- Unser "Viral Pulse" Symbol -->
+    <foreground android:drawable="@drawable/ic_viral_pulse" />
+</adaptive-icon>
