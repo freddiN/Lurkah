@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -21,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -243,6 +247,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     var selectedPost by remember { mutableStateOf<ImgurPost?>(null) }
+    var fullScreenPost by remember { mutableStateOf<ImgurPost?>(null) }
     var accountToBlacklist by remember { mutableStateOf<String?>(null) }
     var showBlacklistDialog by remember { mutableStateOf(false) }
 
@@ -299,6 +304,7 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                     SmartMediaCard(
                         post = post,
                         onClick = { selectedPost = post },
+                        onDoubleClick = { fullScreenPost = post },
                         onAccountClick = { author -> accountToBlacklist = author }
                     )
                 }
@@ -353,6 +359,14 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                     onDismiss = { selectedPost = null }
                 )
             }
+
+            // Vollbild-Viewer
+            fullScreenPost?.let { post ->
+                FullScreenMediaViewer(
+                    post = post,
+                    onDismiss = { fullScreenPost = null }
+                )
+            }
         }
     }
 }
@@ -402,18 +416,29 @@ fun ManageBlacklistDialog(viewModel: ImgurViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String) -> Unit) {
+fun SmartMediaCard(
+    post: ImgurPost, 
+    onClick: () -> Unit, 
+    onDoubleClick: () -> Unit, 
+    onAccountClick: (String) -> Unit
+) {
     Card(
         modifier = Modifier
             .padding(4.dp)
             .fillMaxWidth()
-            .clickable { onClick() }
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
+                    // NEU: Gesten-Erkennung für Single-Tap und Double-Tap
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { onClick() },
+                            onDoubleTap = { onDoubleClick() }
+                        )
+                    }
             ) {
                 AsyncImage(
                     model = post.thumbnailUrl,
@@ -468,6 +493,48 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
                         .padding(8.dp)
                         .clickable { onAccountClick(author) }
                 )
+            }
+        }
+    }
+}
+
+// NEU: Vollbild-Dialog Komponente
+@Composable
+fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .clickable { onDismiss() }
+        ) {
+            if (post.isVideo && post.mediaUrl != null) {
+                VideoPlayer(
+                    videoUrl = post.mediaUrl!!,
+                    isMuted = false,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                AsyncImage(
+                    model = post.mediaUrl,
+                    contentDescription = post.title,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Button zum Schließen oben rechts
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(24.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+            ) {
+                Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
