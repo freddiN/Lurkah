@@ -22,8 +22,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +40,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
@@ -262,7 +264,8 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
         if (!viewModel.isRefreshing) pullToRefreshState.endRefresh()
     }
 
-    val shouldLoadMore = remember {
+    // Performance-Optimierung für Infinite Scroll Check
+    val shouldLoadMore by remember {
         derivedStateOf {
             val totalItems = gridState.layoutInfo.totalItemsCount
             val lastVisibleItem = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -270,8 +273,8 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
         }
     }
 
-    LaunchedEffect(shouldLoadMore.value) {
-        if (shouldLoadMore.value && !viewModel.isLoadingMore && !viewModel.isRefreshing) {
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && !viewModel.isLoadingMore && !viewModel.isRefreshing) {
             viewModel.loadViralPosts(isRefresh = false)
         }
     }
@@ -300,7 +303,11 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 contentPadding = PaddingValues(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(viewModel.posts) { post ->
+                // Key hinzugefügt für butterweiches Scrollen
+                items(
+                    items = viewModel.posts,
+                    key = { post -> post.id }
+                ) { post ->
                     SmartMediaCard(
                         post = post,
                         onClick = { selectedPost = post },
@@ -310,7 +317,7 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 }
 
                 if (viewModel.isLoadingMore) {
-                    item {
+                    item(key = "loading_indicator") {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -360,7 +367,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 )
             }
 
-            // Vollbild-Viewer
             fullScreenPost?.let { post ->
                 FullScreenMediaViewer(
                     post = post,
@@ -417,11 +423,15 @@ fun ManageBlacklistDialog(viewModel: ImgurViewModel, onDismiss: () -> Unit) {
 
 @Composable
 fun SmartMediaCard(
-    post: ImgurPost, 
-    onClick: () -> Unit, 
-    onDoubleClick: () -> Unit, 
+    post: ImgurPost,
+    onClick: () -> Unit,
+    onDoubleClick: () -> Unit,
     onAccountClick: (String) -> Unit
 ) {
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
+    val context = LocalContext.current
+
     Card(
         modifier = Modifier
             .padding(4.dp)
@@ -432,16 +442,21 @@ fun SmartMediaCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    // NEU: Gesten-Erkennung für Single-Tap und Double-Tap
                     .pointerInput(Unit) {
                         detectTapGestures(
-                            onTap = { onClick() },
-                            onDoubleTap = { onDoubleClick() }
+                            onTap = { currentOnClick() },
+                            onDoubleTap = { currentOnDoubleClick() }
                         )
                     }
             ) {
+                // Optimiertes Laden von Bildern mit Caching
                 AsyncImage(
-                    model = post.thumbnailUrl,
+                    model = ImageRequest.Builder(context)
+                        .data(post.thumbnailUrl)
+                        .crossfade(true)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .build(),
                     contentDescription = post.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -498,7 +513,6 @@ fun SmartMediaCard(
     }
 }
 
-// NEU: Vollbild-Dialog Komponente
 @Composable
 fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
     Dialog(
@@ -526,7 +540,6 @@ fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
                 )
             }
 
-            // Button zum Schließen oben rechts
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
@@ -651,7 +664,7 @@ fun VideoPlayer(videoUrl: String, isMuted: Boolean, modifier: Modifier = Modifie
     val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
-            repeatMode = Player.REPEAT_MODE_OFF
+            repeatMode = Player.REPEAT_MODE_OFF // Nur einmal abspielen, kein Loop
             volume = if (isMuted) 0f else 1f
             prepare()
             playWhenReady = true
