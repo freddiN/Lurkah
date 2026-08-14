@@ -19,10 +19,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # Hier erzwingen wir Gradle 8.5 statt der Version 9.x:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
 
-      # Hier wurde der 'chmod' Schritt entfernt und direkt 'gradle' aufgerufen:
       - name: Build Debug APK
         run: gradle assembleDebug
 
