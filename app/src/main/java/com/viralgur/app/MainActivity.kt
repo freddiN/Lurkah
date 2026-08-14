@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
@@ -260,8 +262,8 @@ fun ImgurFeedScreen(
     onToggleDarkMode: () -> Unit,
     viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
-    var selectedPost by remember { mutableStateOf<ImgurPost?>(null) }
-    var fullScreenPost by remember { mutableStateOf<ImgurPost?>(null) }
+    var selectedPostIndex by remember { mutableStateOf<Int?>(null) }
+    var fullScreenPostIndex by remember { mutableStateOf<Int?>(null) }
     var accountToBlacklist by remember { mutableStateOf<String?>(null) }
     var showBlacklistDialog by remember { mutableStateOf(false) }
 
@@ -320,14 +322,14 @@ fun ImgurFeedScreen(
                 contentPadding = PaddingValues(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(
+                itemsIndexed(
                     items = viewModel.posts,
-                    key = { post -> post.id }
-                ) { post ->
+                    key = { _, post -> post.id }
+                ) { index, post ->
                     SmartMediaCard(
                         post = post,
-                        onClick = { selectedPost = post },
-                        onDoubleClick = { fullScreenPost = post },
+                        onClick = { selectedPostIndex = index },
+                        onDoubleClick = { fullScreenPostIndex = index },
                         onAccountClick = { author -> accountToBlacklist = author }
                     )
                 }
@@ -375,19 +377,20 @@ fun ImgurFeedScreen(
                 )
             }
 
-            selectedPost?.let { post ->
+            selectedPostIndex?.let { initialIndex ->
                 PostDetailBottomSheet(
-                    post = post,
+                    initialIndex = initialIndex,
                     viewModel = viewModel,
-                    onDismiss = { selectedPost = null },
-                    onDoubleClick = { fullScreenPost = post }
+                    onDismiss = { selectedPostIndex = null },
+                    onDoubleClick = { index -> fullScreenPostIndex = index }
                 )
             }
 
-            fullScreenPost?.let { post ->
+            fullScreenPostIndex?.let { initialIndex ->
                 FullScreenMediaViewer(
-                    post = post,
-                    onDismiss = { fullScreenPost = null }
+                    initialIndex = initialIndex,
+                    posts = viewModel.posts,
+                    onDismiss = { fullScreenPostIndex = null }
                 )
             }
         }
@@ -530,10 +533,12 @@ fun SmartMediaCard(
 }
 
 @Composable
-fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+fun FullScreenMediaViewer(
+    initialIndex: Int,
+    posts: List<ImgurPost>,
+    onDismiss: () -> Unit
+) {
+    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { posts.size })
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -543,57 +548,75 @@ fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 5f)
-                        if (scale > 1f) {
-                            offsetX += pan.x
-                            offsetY += pan.y
-                        } else {
-                            offsetX = 0f
-                            offsetY = 0f
-                        }
-                    }
-                }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = {
-                            if (scale > 1f) {
-                                scale = 1f
-                                offsetX = 0f
-                                offsetY = 0f
-                            } else {
-                                scale = 2.5f
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                val post = posts[page]
+                var scale by remember { mutableFloatStateOf(1f) }
+                var offsetX by remember { mutableFloatStateOf(0f) }
+                var offsetY by remember { mutableFloatStateOf(0f) }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                if (scale > 1f) {
+                                    offsetX += pan.x
+                                    offsetY += pan.y
+                                } else {
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                }
                             }
                         }
-                    )
-                }
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (post.isVideo && post.mediaUrl != null) {
-                    VideoPlayer(
-                        videoUrl = post.mediaUrl!!,
-                        isMuted = false,
-                        showControls = false,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    AsyncImage(
-                        model = post.mediaUrl,
-                        contentDescription = post.title,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    if (scale > 1f) {
+                                        scale = 1f
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    } else {
+                                        scale = 2.5f
+                                    }
+                                }
+                            )
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offsetX,
+                                translationY = offsetY
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (post.isVideo && post.mediaUrl != null) {
+                            // Video wird nur abgespielt, wenn diese Seite aktiv angezeigt wird
+                            if (pagerState.currentPage == page) {
+                                VideoPlayer(
+                                    videoUrl = post.mediaUrl!!,
+                                    isMuted = false,
+                                    showControls = false,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        } else {
+                            AsyncImage(
+                                model = post.mediaUrl,
+                                contentDescription = post.title,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
                 }
             }
 
@@ -685,101 +708,116 @@ fun CommentItem(comment: ImgurComment, depth: Int = 0) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailBottomSheet(
-    post: ImgurPost,
+    initialIndex: Int,
     viewModel: ImgurViewModel,
     onDismiss: () -> Unit,
-    onDoubleClick: () -> Unit
+    onDoubleClick: (Int) -> Unit
 ) {
-    LaunchedEffect(post.id) { viewModel.loadCommentsForPost(post.id) }
+    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { viewModel.posts.size })
+
+    // Lade Kommentare neu, wenn zu einem anderen Post geswipt wird
+    LaunchedEffect(pagerState.currentPage) {
+        val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
+        currentPost?.let { viewModel.loadCommentsForPost(it.id) }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.9f)) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
-            item {
-                Text(
-                    text = post.title, 
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val post = viewModel.posts[page]
 
-                Text(
-                    text = "${post.typeLabel} • File size: ${post.formattedSize}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                ) {
-                    if (post.isVideo && post.mediaUrl != null) {
-                        VideoPlayer(
-                            videoUrl = post.mediaUrl!!, 
-                            isMuted = false,
-                            onDoubleClick = onDoubleClick,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 350.dp)
-                        )
-                    } else {
-                        AsyncImage(
-                            model = post.mediaUrl, 
-                            contentDescription = post.title, 
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 350.dp)
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onDoubleTap = { onDoubleClick() }
-                                    )
-                                }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "Comments", 
-                    style = MaterialTheme.typography.titleMedium, 
-                    fontWeight = FontWeight.Bold
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-            }
-
-            if (viewModel.isLoadingComments) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(bottom = 32.dp)
+            ) {
                 item {
+                    Text(
+                        text = post.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Text(
+                        text = "${post.typeLabel} • File size: ${post.formattedSize}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp), 
-                        contentAlignment = Alignment.Center
+                            .wrapContentHeight()
                     ) {
-                        CircularProgressIndicator()
+                        if (post.isVideo && post.mediaUrl != null) {
+                            if (pagerState.currentPage == page) {
+                                VideoPlayer(
+                                    videoUrl = post.mediaUrl!!,
+                                    isMuted = false,
+                                    onDoubleClick = { onDoubleClick(page) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 350.dp)
+                                )
+                            }
+                        } else {
+                            AsyncImage(
+                                model = post.mediaUrl,
+                                contentDescription = post.title,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 350.dp)
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onDoubleTap = { onDoubleClick(page) }
+                                        )
+                                    }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Comments",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                }
+
+                if (viewModel.isLoadingComments) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                } else if (viewModel.selectedPostComments.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No comments available.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
                     }
                 }
-            } else if (viewModel.selectedPostComments.isEmpty()) {
-                item {
-                    Text(
-                        text = "No comments available.", 
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-            }
 
-            items(
-                items = viewModel.selectedPostComments,
-                key = { comment -> comment.id }
-            ) { comment ->
-                CommentItem(comment = comment, depth = 0)
+                items(
+                    items = viewModel.selectedPostComments,
+                    key = { comment -> comment.id }
+                ) { comment ->
+                    CommentItem(comment = comment, depth = 0)
+                }
             }
         }
     }
