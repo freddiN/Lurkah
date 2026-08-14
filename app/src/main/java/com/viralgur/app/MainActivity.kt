@@ -1,7 +1,6 @@
 package com.viralgur.app
 
 import android.net.Uri
-import android.os.Build.VERSION.SDK_INT
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,14 +12,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -34,11 +31,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
@@ -82,16 +76,23 @@ data class ImgurComment(
 
 // --- API SERVICE ---
 interface ImgurApiService {
-    // Ruft den Feed der mobilen Web-Version direkt ab (ohne Client-ID)
-    @GET("gallery/hot/viral/page/{page}.json")
+    @GET("3/gallery/hot/viral/{page}")
     suspend fun getMostViral(
+        @Header("Authorization") authHeader: String,
         @Path("page") page: Int = 0
     ): ImgurResponse
+
+    @GET("3/gallery/{galleryHash}/comments/best")
+    suspend fun getComments(
+        @Header("Authorization") authHeader: String,
+        @Path("galleryHash") galleryHash: String
+    ): ImgurCommentsResponse
 }
 
 // --- VIEWMODEL ---
 class ImgurViewModel : ViewModel() {
-    private val clientId = "Client-ID YOUR_CLIENT_ID_HERE" // <--- Deine Client-ID eintragen!
+    // Öffentliche Client-ID (Flameshot OpenSource Fallback)
+    private val clientId = "Client-ID 546c25a59c58ad7"
 
     private val api: ImgurApiService by lazy {
         Retrofit.Builder()
@@ -225,12 +226,11 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 modifier = Modifier.align(Alignment.TopCenter)
             )
 
-            // 1. Blacklist Bestätigungs-Dialog
             accountToBlacklist?.let { author ->
                 AlertDialog(
                     onDismissRequest = { accountToBlacklist = null },
                     title = { Text("Account blockieren?") },
-                    text = { Text("Möchtest du '$author' zur Blacklist hinzufügen? Seine Beiträge werden künftig ausgeblendet.") },
+                    text = { Text("Möchtest du '$author' zur Blacklist hinzufügen?") },
                     confirmButton = {
                         Button(onClick = {
                             viewModel.addAccountToBlacklist(author)
@@ -243,7 +243,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 )
             }
 
-            // 2. Detail Ansicht + Kommentare
             selectedPost?.let { post ->
                 PostDetailBottomSheet(
                     post = post,
@@ -297,7 +296,6 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
                 }
             }
 
-            // Account-Name unter dem Bild
             post.accountUrl?.let { author ->
                 Text(
                     text = "@$author",
