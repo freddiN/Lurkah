@@ -235,9 +235,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            var isDarkMode by remember { mutableStateOf(true) }
+            val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+
+            MaterialTheme(colorScheme = colorScheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ImgurFeedScreen()
+                    ImgurFeedScreen(
+                        isDarkMode = isDarkMode,
+                        onToggleDarkMode = { isDarkMode = !isDarkMode }
+                    )
                 }
             }
         }
@@ -247,7 +253,11 @@ class MainActivity : ComponentActivity() {
 // --- UI COMPONENTS ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
+fun ImgurFeedScreen(
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
+    viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+) {
     var selectedPost by remember { mutableStateOf<ImgurPost?>(null) }
     var fullScreenPost by remember { mutableStateOf<ImgurPost?>(null) }
     var accountToBlacklist by remember { mutableStateOf<String?>(null) }
@@ -264,7 +274,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
         if (!viewModel.isRefreshing) pullToRefreshState.endRefresh()
     }
 
-    // Performance-Optimierung für Infinite Scroll Check
     val shouldLoadMore by remember {
         derivedStateOf {
             val totalItems = gridState.layoutInfo.totalItemsCount
@@ -284,6 +293,13 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
             TopAppBar(
                 title = { Text("Viralgur - Most Viral") },
                 actions = {
+                    // Theme-Toggle Icon
+                    IconButton(onClick = onToggleDarkMode) {
+                        Text(
+                            text = if (isDarkMode) "☀️" else "🌙",
+                            fontSize = 18.sp
+                        )
+                    }
                     TextButton(onClick = { showBlacklistDialog = true }) {
                         Text("🚫 (${viewModel.blacklistedAccounts.size})")
                     }
@@ -303,7 +319,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 contentPadding = PaddingValues(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Key hinzugefügt für butterweiches Scrollen
                 items(
                     items = viewModel.posts,
                     key = { post -> post.id }
@@ -449,7 +464,6 @@ fun SmartMediaCard(
                         )
                     }
             ) {
-                // Optimiertes Laden von Bildern mit Caching
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(post.thumbnailUrl)
@@ -664,7 +678,7 @@ fun VideoPlayer(videoUrl: String, isMuted: Boolean, modifier: Modifier = Modifie
     val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
-            repeatMode = Player.REPEAT_MODE_OFF // Nur einmal abspielen, kein Loop
+            repeatMode = Player.REPEAT_MODE_OFF
             volume = if (isMuted) 0f else 1f
             prepare()
             playWhenReady = true
