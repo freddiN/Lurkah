@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -22,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -293,7 +295,6 @@ fun ImgurFeedScreen(
             TopAppBar(
                 title = { Text("Viralgur - Most Viral") },
                 actions = {
-                    // Theme-Toggle Icon
                     IconButton(onClick = onToggleDarkMode) {
                         Text(
                             text = if (isDarkMode) "☀️" else "🌙",
@@ -378,7 +379,8 @@ fun ImgurFeedScreen(
                 PostDetailBottomSheet(
                     post = post,
                     viewModel = viewModel,
-                    onDismiss = { selectedPost = null }
+                    onDismiss = { selectedPost = null },
+                    onDoubleClick = { fullScreenPost = post }
                 )
             }
 
@@ -529,6 +531,10 @@ fun SmartMediaCard(
 
 @Composable
 fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -537,21 +543,58 @@ fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .clickable { onDismiss() }
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 5f)
+                        if (scale > 1f) {
+                            offsetX += pan.x
+                            offsetY += pan.y
+                        } else {
+                            offsetX = 0f
+                            offsetY = 0f
+                        }
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (scale > 1f) {
+                                scale = 1f
+                                offsetX = 0f
+                                offsetY = 0f
+                            } else {
+                                scale = 2.5f
+                            }
+                        }
+                    )
+                }
         ) {
-            if (post.isVideo && post.mediaUrl != null) {
-                VideoPlayer(
-                    videoUrl = post.mediaUrl!!,
-                    isMuted = false,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                AsyncImage(
-                    model = post.mediaUrl,
-                    contentDescription = post.title,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offsetX,
+                        translationY = offsetY
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (post.isVideo && post.mediaUrl != null) {
+                    VideoPlayer(
+                        videoUrl = post.mediaUrl!!,
+                        isMuted = false,
+                        showControls = false,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    AsyncImage(
+                        model = post.mediaUrl,
+                        contentDescription = post.title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             IconButton(
@@ -569,7 +612,12 @@ fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss: () -> Unit) {
+fun PostDetailBottomSheet(
+    post: ImgurPost,
+    viewModel: ImgurViewModel,
+    onDismiss: () -> Unit,
+    onDoubleClick: () -> Unit
+) {
     LaunchedEffect(post.id) { viewModel.loadCommentsForPost(post.id) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.9f)) {
@@ -601,7 +649,8 @@ fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss:
                     if (post.isVideo && post.mediaUrl != null) {
                         VideoPlayer(
                             videoUrl = post.mediaUrl!!, 
-                            isMuted = false, 
+                            isMuted = false,
+                            onDoubleClick = onDoubleClick,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 350.dp)
@@ -614,6 +663,11 @@ fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss:
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 350.dp)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onDoubleTap = { onDoubleClick() }
+                                    )
+                                }
                         )
                     }
                 }
@@ -673,8 +727,16 @@ fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss:
 }
 
 @Composable
-fun VideoPlayer(videoUrl: String, isMuted: Boolean, modifier: Modifier = Modifier) {
+fun VideoPlayer(
+    videoUrl: String,
+    isMuted: Boolean,
+    modifier: Modifier = Modifier,
+    showControls: Boolean = true,
+    onDoubleClick: (() -> Unit)? = null
+) {
     val context = LocalContext.current
+    val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
+
     val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
@@ -692,14 +754,29 @@ fun VideoPlayer(videoUrl: String, isMuted: Boolean, modifier: Modifier = Modifie
         }
     }
 
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = true
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            }
-        },
-        modifier = modifier
-    )
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = showControls
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Beseitigt das Blockieren von Doppeltipps beim Abspielen des Videos
+        if (currentOnDoubleClick != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { currentOnDoubleClick?.invoke() }
+                        )
+                    }
+            )
+        }
+    }
 }
