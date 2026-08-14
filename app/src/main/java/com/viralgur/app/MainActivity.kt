@@ -82,17 +82,11 @@ data class ImgurComment(
 
 // --- API SERVICE ---
 interface ImgurApiService {
-    @GET("3/gallery/hot/viral/{page}")
+    // Ruft den Feed der mobilen Web-Version direkt ab (ohne Client-ID)
+    @GET("gallery/hot/viral/page/{page}.json")
     suspend fun getMostViral(
-        @Header("Authorization") authHeader: String,
         @Path("page") page: Int = 0
     ): ImgurResponse
-
-    @GET("3/gallery/{galleryHash}/comments/best")
-    suspend fun getComments(
-        @Header("Authorization") authHeader: String,
-        @Path("galleryHash") galleryHash: String
-    ): ImgurCommentsResponse
 }
 
 // --- VIEWMODEL ---
