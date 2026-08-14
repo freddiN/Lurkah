@@ -91,7 +91,6 @@ interface ImgurApiService {
 
 // --- VIEWMODEL ---
 class ImgurViewModel : ViewModel() {
-    // Öffentliche Client-ID (Flameshot OpenSource Fallback)
     private val clientId = "Client-ID 546c25a59c58ad7"
 
     private val api: ImgurApiService by lazy {
@@ -165,6 +164,11 @@ class ImgurViewModel : ViewModel() {
             loadViralPosts()
         }
     }
+
+    fun removeAccountFromBlacklist(accountName: String) {
+        blacklistedAccounts.remove(accountName)
+        loadViralPosts()
+    }
 }
 
 // --- MAIN ACTIVITY ---
@@ -187,6 +191,7 @@ class MainActivity : ComponentActivity() {
 fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     var selectedPost by remember { mutableStateOf<ImgurPost?>(null) }
     var accountToBlacklist by remember { mutableStateOf<String?>(null) }
+    var showBlacklistDialog by remember { mutableStateOf(false) }
 
     val pullToRefreshState = rememberPullToRefreshState()
 
@@ -199,7 +204,16 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Viralgur - Most Viral") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("Viralgur - Most Viral") },
+                actions = {
+                    TextButton(onClick = { showBlacklistDialog = true }) {
+                        Text("🚫 (${viewModel.blacklistedAccounts.size})")
+                    }
+                }
+            )
+        }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -226,6 +240,7 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 modifier = Modifier.align(Alignment.TopCenter)
             )
 
+            // 1. Account zur Blacklist hinzufügen Dialog
             accountToBlacklist?.let { author ->
                 AlertDialog(
                     onDismissRequest = { accountToBlacklist = null },
@@ -243,6 +258,15 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 )
             }
 
+            // 2. Blacklist-Verwaltungs-Dialog
+            if (showBlacklistDialog) {
+                ManageBlacklistDialog(
+                    viewModel = viewModel,
+                    onDismiss = { showBlacklistDialog = false }
+                )
+            }
+
+            // 3. Detail Ansicht + Kommentare
             selectedPost?.let { post ->
                 PostDetailBottomSheet(
                     post = post,
@@ -252,6 +276,50 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
             }
         }
     }
+}
+
+@Composable
+fun ManageBlacklistDialog(viewModel: ImgurViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Geblockte Accounts") },
+        text = {
+            if (viewModel.blacklistedAccounts.isEmpty()) {
+                Text("Deine Blacklist ist aktuell leer.")
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp)
+                ) {
+                    items(viewModel.blacklistedAccounts) { account ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "@$account",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            IconButton(
+                                onClick = { viewModel.removeAccountFromBlacklist(account) }
+                            ) {
+                                Text(text = "❌", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Schließen") }
+        }
+    )
 }
 
 @Composable
