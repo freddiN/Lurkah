@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Äußerer pulsierender Kreis/Ring -->
+    <path
+        android:pathData="M54,22 C36.33,22 22,36.33 22,54 C22,71.67 36.33,86 54,86 C71.67,86 86,71.67 86,54"
+        android:strokeWidth="4"
+        android:strokeColor="#1BB76E"
+        android:strokeLineCap="round"/>
+
+    <!-- Das stilisierte "V" mit integrierter Play-Welle -->
+    <path
+        android:pathData="M38,40 L54,68 L70,40"
+        android:strokeWidth="8"
+        android:strokeColor="#1BB76E"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+
+    <!-- Kleiner leuchtender Puls-Punkt -->
+    <path
+        android:pathData="M78,32 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"
+        android:fillColor="#00FF88"/>
+</vector>
