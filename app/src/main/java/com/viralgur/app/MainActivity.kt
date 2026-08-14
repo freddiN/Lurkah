@@ -9,8 +9,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
@@ -113,30 +115,49 @@ class ImgurViewModel : ViewModel() {
     var isRefreshing by mutableStateOf(false)
         private set
 
+    var isLoadingMore by mutableStateOf(false)
+        private set
+
     var isLoadingComments by mutableStateOf(false)
         private set
 
+    private var currentPage = 0
+
     init {
-        loadViralPosts()
+        loadViralPosts(isRefresh = true)
     }
 
-    fun loadViralPosts() {
+    // NEU: Unterstützung für Seiten-Pagination
+    fun loadViralPosts(isRefresh: Boolean = false) {
+        if (isLoadingMore) return
+
         viewModelScope.launch {
-            isRefreshing = true
+            if (isRefresh) {
+                isRefreshing = true
+                currentPage = 0
+            } else {
+                isLoadingMore = true
+            }
+
             try {
-                val response = api.getMostViral(authHeader = clientId)
+                val response = api.getMostViral(authHeader = clientId, page = currentPage)
                 if (response.success) {
                     val filtered = response.data.filter { post ->
                         val author = post.accountUrl?.lowercase() ?: ""
                         !blacklistedAccounts.map { it.lowercase() }.contains(author) && post.mediaUrl != null
                     }
-                    posts.clear()
+
+                    if (isRefresh) {
+                        posts.clear()
+                    }
                     posts.addAll(filtered)
+                    currentPage++
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isRefreshing = false
+                isLoadingMore = false
             }
         }
     }
@@ -161,13 +182,13 @@ class ImgurViewModel : ViewModel() {
     fun addAccountToBlacklist(accountName: String) {
         if (accountName.isNotBlank() && !blacklistedAccounts.contains(accountName)) {
             blacklistedAccounts.add(accountName)
-            loadViralPosts()
+            loadViralPosts(isRefresh = true)
         }
     }
 
     fun removeAccountFromBlacklist(accountName: String) {
         blacklistedAccounts.remove(accountName)
-        loadViralPosts()
+        loadViralPosts(isRefresh = true)
     }
 }
 
@@ -194,13 +215,30 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
     var showBlacklistDialog by remember { mutableStateOf(false) }
 
     val pullToRefreshState = rememberPullToRefreshState()
+    val gridState = rememberLazyGridState()
 
+    // Pull-to-Refresh: Setzt die Seiten zurück und lädt neu
     if (pullToRefreshState.isRefreshing) {
-        LaunchedEffect(true) { viewModel.loadViralPosts() }
+        LaunchedEffect(true) { viewModel.loadViralPosts(isRefresh = true) }
     }
 
     LaunchedEffect(viewModel.isRefreshing) {
         if (!viewModel.isRefreshing) pullToRefreshState.endRefresh()
+    }
+
+    // NEU: Erkennt, wenn der Nutzer das Ende der Liste erreicht hat und lädt die nächste Seite nach
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val totalItems = gridState.layoutInfo.totalItemsCount
+            val lastVisibleItem = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            totalItems > 0 && lastVisibleItem >= totalItems - 4
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value && !viewModel.isLoadingMore && !viewModel.isRefreshing) {
+            viewModel.loadViralPosts(isRefresh = false)
+        }
     }
 
     Scaffold(
@@ -223,6 +261,7 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
+                state = gridState,
                 contentPadding = PaddingValues(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -232,6 +271,20 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                         onClick = { selectedPost = post },
                         onAccountClick = { author -> accountToBlacklist = author }
                     )
+                }
+
+                // Ladeindikator unten an der Liste anzeigen, wenn weitere Posts geladen werden
+                if (viewModel.isLoadingMore) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
+                    }
                 }
             }
 
@@ -376,7 +429,6 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
     }
 }
 
-// GEÄNDERT: Korrigiertes Layout für das BottomSheet, damit Bild und Kommentare sauber getrennt sind
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss: () -> Unit) {
