@@ -1,3 +1,8 @@
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
+
 package com.viralgur.app
 
 import android.net.Uri
@@ -255,7 +260,6 @@ class MainActivity : ComponentActivity() {
 }
 
 // --- UI COMPONENTS ---
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImgurFeedScreen(
     isDarkMode: Boolean,
@@ -599,7 +603,6 @@ fun FullScreenMediaViewer(
                         contentAlignment = Alignment.Center
                     ) {
                         if (post.isVideo && post.mediaUrl != null) {
-                            // Video wird nur abgespielt, wenn diese Seite aktiv angezeigt wird
                             if (pagerState.currentPage == page) {
                                 VideoPlayer(
                                     videoUrl = post.mediaUrl!!,
@@ -705,7 +708,6 @@ fun CommentItem(comment: ImgurComment, depth: Int = 0) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailBottomSheet(
     initialIndex: Int,
@@ -715,7 +717,6 @@ fun PostDetailBottomSheet(
 ) {
     val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { viewModel.posts.size })
 
-    // Lade Kommentare neu, wenn zu einem anderen Post geswipt wird
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { viewModel.loadCommentsForPost(it.id) }
