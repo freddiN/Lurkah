@@ -293,7 +293,7 @@ fun ImgurFeedScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Viralgur - Most Viral") },
+                title = { Text("ViralGur") },
                 actions = {
                     IconButton(onClick = onToggleDarkMode) {
                         Text(
@@ -610,6 +610,78 @@ fun FullScreenMediaViewer(post: ImgurPost, onDismiss: () -> Unit) {
     }
 }
 
+@Composable
+fun CommentItem(comment: ImgurComment, depth: Int = 0) {
+    val maxDepth = 4
+    val currentIndent = depth.coerceAtMost(maxDepth)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        if (currentIndent > 0) {
+            repeat(currentIndent) {
+                Box(
+                    modifier = Modifier
+                        .width(12.dp)
+                        .fillMaxHeight()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(2.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                            .align(Alignment.CenterStart)
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .background(
+                    if (depth > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "@${comment.author}",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                val score = comment.ups - comment.downs
+                Text(
+                    text = "▲ $score",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = comment.comment,
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            comment.children?.forEach { childComment ->
+                Spacer(modifier = Modifier.height(4.dp))
+                CommentItem(comment = childComment, depth = depth + 1)
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailBottomSheet(
@@ -703,24 +775,11 @@ fun PostDetailBottomSheet(
                 }
             }
 
-            items(viewModel.selectedPostComments) { comment ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                ) {
-                    Text(
-                        text = comment.author, 
-                        fontWeight = FontWeight.Bold, 
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = comment.comment, 
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+            items(
+                items = viewModel.selectedPostComments,
+                key = { comment -> comment.id }
+            ) { comment ->
+                CommentItem(comment = comment, depth = 0)
             }
         }
     }
@@ -742,6 +801,7 @@ fun VideoPlayer(
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
             repeatMode = Player.REPEAT_MODE_OFF
             volume = if (isMuted) 0f else 1f
+            pauseAtEndOfMediaItems = true
             prepare()
             playWhenReady = true
         }
@@ -750,33 +810,27 @@ fun VideoPlayer(
     DisposableEffect(videoUrl) {
         onDispose {
             exoPlayer.stop()
+            exoPlayer.clearMediaItems()
             exoPlayer.release()
         }
     }
 
-    Box(modifier = modifier) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = showControls
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                player = exoPlayer
+                useController = showControls
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+        },
+        modifier = modifier.then(
+            if (currentOnDoubleClick != null) {
+                Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = { currentOnDoubleClick?.invoke() }
+                    )
                 }
-            },
-            modifier = Modifier.fillMaxSize()
+            } else Modifier
         )
-
-        // Beseitigt das Blockieren von Doppeltipps beim Abspielen des Videos
-        if (currentOnDoubleClick != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = { currentOnDoubleClick?.invoke() }
-                        )
-                    }
-            )
-        }
-    }
+    )
 }
