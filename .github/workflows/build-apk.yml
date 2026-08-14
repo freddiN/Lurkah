@@ -27,8 +27,12 @@ jobs:
       - name: Build Debug APK
         run: gradle assembleDebug
 
+      # NEU: Benennt die erzeugte APK vor dem Hochladen um
+      - name: Rename APK
+        run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/viralgur.apk
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Viralgur-App-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/viralgur.apk
