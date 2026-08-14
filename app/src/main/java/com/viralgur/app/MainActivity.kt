@@ -74,7 +74,7 @@ data class ImgurPost(
 
     val formattedSize: String
         get() {
-            if (sizeInBytes <= 0) return "unbekannt"
+            if (sizeInBytes <= 0) return "unknown"
             val kb = sizeInBytes / 1024.0
             val mb = kb / 1024.0
             return if (mb >= 1.0) {
@@ -88,7 +88,7 @@ data class ImgurPost(
         get() = when {
             isVideo -> "🎥 MP4"
             isGif -> "🎞️ GIF"
-            else -> "🖼️ BILD"
+            else -> "🖼️ IMAGE"
         }
 }
 
@@ -325,16 +325,16 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
             accountToBlacklist?.let { author ->
                 AlertDialog(
                     onDismissRequest = { accountToBlacklist = null },
-                    title = { Text("Account blockieren?") },
-                    text = { Text("Möchtest du '$author' zur Blacklist hinzufügen?") },
+                    title = { Text("Block Account?") },
+                    text = { Text("Do you want to add '$author' to your blacklist?") },
                     confirmButton = {
                         Button(onClick = {
                             viewModel.addAccountToBlacklist(author)
                             accountToBlacklist = null
-                        }) { Text("Blockieren") }
+                        }) { Text("Block") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { accountToBlacklist = null }) { Text("Abbrechen") }
+                        TextButton(onClick = { accountToBlacklist = null }) { Text("Cancel") }
                     }
                 )
             }
@@ -361,10 +361,10 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
 fun ManageBlacklistDialog(viewModel: ImgurViewModel, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Geblockte Accounts") },
+        title = { Text("Blocked Accounts") },
         text = {
             if (viewModel.blacklistedAccounts.isEmpty()) {
-                Text("Deine Blacklist ist aktuell leer.")
+                Text("Your blacklist is currently empty.")
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -396,7 +396,7 @@ fun ManageBlacklistDialog(viewModel: ImgurViewModel, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Schließen") }
+            TextButton(onClick = onDismiss) { Text("Close") }
         }
     )
 }
@@ -415,7 +415,6 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
                     .fillMaxWidth()
                     .aspectRatio(1f)
             ) {
-                // 1. Thumbnail / Vorschaubild (Kein Autoplay)
                 AsyncImage(
                     model = post.thumbnailUrl,
                     contentDescription = post.title,
@@ -423,7 +422,6 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // 2. Play-Button Badge für Videos
                 if (post.isVideo) {
                     Box(
                         modifier = Modifier
@@ -445,7 +443,6 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
                     }
                 }
 
-                // 3. Typ- & Größen-Badge oben links auf der Karte
                 Surface(
                     shape = RoundedCornerShape(bottomEnd = 8.dp),
                     color = Color.Black.copy(alpha = 0.7f),
@@ -495,9 +492,8 @@ fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss:
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                // Größen- und Typanzeige in der Detailansicht
                 Text(
-                    text = "${post.typeLabel} • Dateigröße: ${post.formattedSize}",
+                    text = "${post.typeLabel} • File size: ${post.formattedSize}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -530,7 +526,7 @@ fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss:
 
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Kommentare", 
+                    text = "Comments", 
                     style = MaterialTheme.typography.titleMedium, 
                     fontWeight = FontWeight.Bold
                 )
@@ -551,7 +547,7 @@ fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss:
             } else if (viewModel.selectedPostComments.isEmpty()) {
                 item {
                     Text(
-                        text = "Keine Kommentare vorhanden.", 
+                        text = "No comments available.", 
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 8.dp)
@@ -606,7 +602,7 @@ fun VideoPlayer(videoUrl: String, isMuted: Boolean, modifier: Modifier = Modifie
         factory = { ctx ->
             PlayerView(ctx).apply {
                 player = exoPlayer
-                useController = true // Mit Video-Play/Pause-Steuerung im Detailmenü
+                useController = true
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
             }
         },
