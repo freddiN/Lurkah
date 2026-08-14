@@ -240,7 +240,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 modifier = Modifier.align(Alignment.TopCenter)
             )
 
-            // 1. Account zur Blacklist hinzufügen Dialog
             accountToBlacklist?.let { author ->
                 AlertDialog(
                     onDismissRequest = { accountToBlacklist = null },
@@ -258,7 +257,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 )
             }
 
-            // 2. Blacklist-Verwaltungs-Dialog
             if (showBlacklistDialog) {
                 ManageBlacklistDialog(
                     viewModel = viewModel,
@@ -266,7 +264,6 @@ fun ImgurFeedScreen(viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.com
                 )
             }
 
-            // 3. Detail Ansicht + Kommentare
             selectedPost?.let { post ->
                 PostDetailBottomSheet(
                     post = post,
@@ -379,40 +376,99 @@ fun SmartMediaCard(post: ImgurPost, onClick: () -> Unit, onAccountClick: (String
     }
 }
 
+// GEÄNDERT: Korrigiertes Layout für das BottomSheet, damit Bild und Kommentare sauber getrennt sind
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostDetailBottomSheet(post: ImgurPost, viewModel: ImgurViewModel, onDismiss: () -> Unit) {
     LaunchedEffect(post.id) { viewModel.loadCommentsForPost(post.id) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.9f)) {
-        LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(bottom = 32.dp)
+        ) {
             item {
-                Text(text = post.title, style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = post.title, 
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
 
-                if (post.isVideo && post.mediaUrl != null) {
-                    VideoPlayer(videoUrl = post.mediaUrl!!, isMuted = false, modifier = Modifier.fillMaxWidth().height(250.dp))
-                } else {
-                    AsyncImage(model = post.mediaUrl, contentDescription = post.title, modifier = Modifier.fillMaxWidth())
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                ) {
+                    if (post.isVideo && post.mediaUrl != null) {
+                        VideoPlayer(
+                            videoUrl = post.mediaUrl!!, 
+                            isMuted = false, 
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 350.dp)
+                        )
+                    } else {
+                        AsyncImage(
+                            model = post.mediaUrl, 
+                            contentDescription = post.title, 
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 350.dp)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Kommentare", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Kommentare", 
+                    style = MaterialTheme.typography.titleMedium, 
+                    fontWeight = FontWeight.Bold
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
             }
 
             if (viewModel.isLoadingComments) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp), 
+                        contentAlignment = Alignment.Center
+                    ) {
                         CircularProgressIndicator()
                     }
+                }
+            } else if (viewModel.selectedPostComments.isEmpty()) {
+                item {
+                    Text(
+                        text = "Keine Kommentare vorhanden.", 
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 }
             }
 
             items(viewModel.selectedPostComments) { comment ->
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    Text(text = comment.author, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                    Text(text = comment.comment, style = MaterialTheme.typography.bodyMedium)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                ) {
+                    Text(
+                        text = comment.author, 
+                        fontWeight = FontWeight.Bold, 
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = comment.comment, 
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
         }
@@ -444,7 +500,7 @@ fun VideoPlayer(videoUrl: String, isMuted: Boolean, modifier: Modifier = Modifie
             PlayerView(ctx).apply {
                 player = exoPlayer
                 useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
             }
         },
         modifier = modifier
