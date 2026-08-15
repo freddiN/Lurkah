@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val isDarkMode by mainViewModel.isDarkMode.collectAsState()
-            val autoReplay by mainViewModel.autoPlayVideos.collectAsState()
+            val autoReplay = false // Vorübergehend hartcodiert, bis das ViewModel aktualisiert ist
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
@@ -93,7 +93,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
-            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) },
+            onAutoReplayToggle = { /* viewModel.toggleAutoPlay(it) */ },
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             modifier = Modifier.systemBarsPadding()
@@ -546,23 +546,12 @@ fun PostDetailBottomSheet(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    ext(
+                    Text(
                         text = "${post.typeLabel} • File size: ${post.formattedSize}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-
-
-                    Row(modifier = Modifier.padding(bottom = 12.dp)) {
-                        post.tags.take(5).forEach { tag ->
-                            SuggestionChip(
-                                onClick = { viewModel.addBlacklistUser(tag) },
-                                label = { Text("#$tag") },
-                                modifier = Modifier.padding(end = 4.dp)
-                            )
-                        }
-                    }
 
                     Box(
                         modifier = Modifier
