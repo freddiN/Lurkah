@@ -28,6 +28,14 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    buildTypes {
+    release {
+        isMinifyEnabled = true
+        proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        // Signiert die Release-Version mit dem Standard-Debug-Key, damit sie installierbar ist:
+        signingConfig = signingConfigs.getByName("debug") 
+    }
+}
 }
 
 dependencies {
