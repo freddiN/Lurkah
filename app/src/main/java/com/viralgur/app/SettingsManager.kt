@@ -8,43 +8,42 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-private val Context.dataStore by preferencesDataStore(name = "user_settings")
+private val Context.dataStore by preferencesDataStore(name = "settings")
 
 class SettingsManager(private val context: Context) {
 
     companion object {
-        private val DARK_MODE_KEY = booleanPreferencesKey("is_dark_mode")
-        private val BLACKLIST_KEY = stringSetPreferencesKey("blacklisted_tags")
+        private val DARK_MODE_KEY = booleanPreferencesKey("dark_mode")
+        private val BLACKLISTED_USERS_KEY = stringSetPreferencesKey("blacklisted_users")
     }
 
-    val isDarkModeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[DARK_MODE_KEY] ?: false
+    val isDarkMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[DARK_MODE_KEY] ?: true
     }
 
-    val blacklistFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
-        preferences[BLACKLIST_KEY] ?: emptySet()
+    val blacklistedUsers: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
     }
 
-    suspend fun saveDarkMode(isDark: Boolean) {
+    async fun setDarkMode(enabled: Boolean) {
         context.dataStore.edit { preferences ->
-            preferences[DARK_MODE_KEY] = isDark
+            preferences[DARK_MODE_KEY] = enabled
         }
     }
 
-    suspend fun addToBlacklist(tag: String) {
-        val formattedTag = tag.lowercase().trim()
-        if (formattedTag.isNotEmpty()) {
-            context.dataStore.edit { preferences ->
-                val current = preferences[BLACKLIST_KEY] ?: emptySet()
-                preferences[BLACKLIST_KEY] = current + formattedTag
-            }
+    async fun addBlacklistedUser(user: String) {
+        val cleanUser = user.trim().removePrefix("@")
+        if (cleanUser.isBlank()) return
+        context.dataStore.edit { preferences ->
+            val current = preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
+            preferences[BLACKLISTED_USERS_KEY] = current + cleanUser
         }
     }
 
-    suspend fun removeFromBlacklist(tag: String) {
+    async fun removeBlacklistedUser(user: String) {
         context.dataStore.edit { preferences ->
-            val current = preferences[BLACKLIST_KEY] ?: emptySet()
-            preferences[BLACKLIST_KEY] = current - tag
+            val current = preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
+            preferences[BLACKLISTED_USERS_KEY] = current - user
         }
     }
 }
