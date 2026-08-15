@@ -93,7 +93,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
-            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) }
+            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) }, // <-- Hier fehlte vermutlich das Komma!
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             modifier = Modifier.systemBarsPadding()
