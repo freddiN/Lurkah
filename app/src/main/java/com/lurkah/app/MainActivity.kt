@@ -435,6 +435,13 @@ fun FullScreenMediaViewer(
                             } else {
                                 emptyList()
                             }
+
+                            // .gifv Endungen automatisch auf .mp4 mappen, damit Coil/Player nicht fehlschlagen
+                            rawList.map { img ->
+                                val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
+                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
+                                img.copy(link = fixedLink, mp4 = fixedMp4)
+                            }
                         }
 
                         if (displayItems.isNotEmpty()) {
@@ -675,6 +682,13 @@ fun PostDetailBottomSheet(
                             } else {
                                 emptyList()
                             }
+
+                            // .gifv Endungen automatisch auf .mp4 mappen, damit Coil/Player nicht fehlschlagen
+                            rawList.map { img ->
+                                val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
+                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
+                                img.copy(link = fixedLink, mp4 = fixedMp4)
+                            }
                         }
 
                         Column(
@@ -767,14 +781,13 @@ fun VideoPlayer(
     videoUrl: String,
     isMuted: Boolean,
     autoReplay: Boolean,
-    autoPlayVideos: Boolean, // <--- Dieser Parameter hat gefehlt!
+    autoPlayVideos: Boolean,
     modifier: Modifier = Modifier,
     showControls: Boolean = true,
     onDoubleClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
 
-    // 1. Player erstellen
     val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
@@ -782,21 +795,18 @@ fun VideoPlayer(
         }
     }
 
-    // 2. Player-Parameter bei Änderungen aktualisieren (ohne den Player neu zu bauen)
     LaunchedEffect(autoReplay, autoPlayVideos, isMuted) {
         exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         exoPlayer.volume = if (isMuted) 0f else 1f
         exoPlayer.playWhenReady = autoPlayVideos
     }
 
-    // 3. Cleanup
     DisposableEffect(videoUrl) {
         onDispose {
             exoPlayer.release()
         }
     }
 
-    // 4. AndroidView mit korrekter Update-Logik
     Box(modifier = modifier.background(Color.Black)) {
         AndroidView(
             factory = { ctx ->
@@ -807,7 +817,6 @@ fun VideoPlayer(
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
-                    // Gesture Handling hier sauber halten
                     val gestureDetector = android.view.GestureDetector(
                         ctx,
                         object : android.view.GestureDetector.SimpleOnGestureListener() {
@@ -819,15 +828,15 @@ fun VideoPlayer(
                     )
                     setOnTouchListener { _, event ->
                         gestureDetector.onTouchEvent(event)
-                        true // true zurückgeben, damit Touch-Events konsumiert werden
+                        false // WICHTIG: false, damit PlayerView die Touch-Events für Controls behält!
                     }
                 }
             },
             update = { playerView ->
-                // Wenn sich der Player ändert, hier zuweisen
                 if (playerView.player != exoPlayer) {
                     playerView.player = exoPlayer
                 }
+                playerView.useController = showControls
             },
             modifier = Modifier.fillMaxSize()
         )

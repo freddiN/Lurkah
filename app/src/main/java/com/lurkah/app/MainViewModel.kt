@@ -31,7 +31,8 @@ data class ImgurPost(
     val title: String,
     @SerializedName("account_url") val accountUrl: String?,
     val images: List<ImgurImage>?,
-    @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList()
+    @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList(),
+    val size: Long? // <--- Neu: Erfasst die Dateigröße bei Einzelposts
 ) {
     val tags: List<String>
         get() = rawTags?.map { it.name } ?: emptyList()
@@ -45,13 +46,13 @@ data class ImgurPost(
         get() = "https://i.imgur.com/${mainMedia?.id ?: id}m.jpg"
 
     val isVideo: Boolean
-        get() = (mainMedia?.type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true
+        get() = (mainMedia?.type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true || mediaUrl?.endsWith(".gifv") == true
 
     val isGif: Boolean
         get() = mainMedia?.type == "image/gif" || mediaUrl?.endsWith(".gif") == true
 
     val sizeInBytes: Long
-        get() = mainMedia?.size ?: 0L
+        get() = mainMedia?.size ?: size ?: 0L
 
     val formattedSize: String
         get() {
