@@ -185,16 +185,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentPage = 0
 
-    init {
+    iinit {
         viewModelScope.launch {
-            combine(blacklistedUsers, blacklistedTags) { users, tags ->
-                Pair(users, tags)
-            }.collect { _ ->
-                // Hier könnte man noch ein .debounce(300) einbauen,
-                // falls die SettingsManager-Updates sehr schnell hintereinander feuern
+            blacklistedUsers.collect {
                 loadViralPosts(isRefresh = true)
             }
         }
+        viewModelScope.launch {
+            blacklistedTags.collect {
+                loadViralPosts(isRefresh = true)
+            }
+        }
+    }
     }
 
     fun loadViralPosts(isRefresh: Boolean = false) {
