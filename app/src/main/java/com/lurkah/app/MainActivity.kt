@@ -246,6 +246,7 @@ fun ImgurFeedScreen(
                     autoReplay = autoReplay,
                     onDismiss = { selectedPostIndex = null },
                     onDoubleClick = { index ->
+                        // BottomSheet schließen und sofort den Vollbild-Viewer mit demselben Index öffnen
                         selectedPostIndex = null
                         fullScreenPostIndex = index
                     }
@@ -257,7 +258,11 @@ fun ImgurFeedScreen(
                     initialIndex = initialIndex,
                     posts = viewModel.posts,
                     autoReplay = autoReplay,
-                    onDismiss = { fullScreenPostIndex = null }
+                    onDismiss = { index ->
+                        // Vollbild schließen und das BottomSheet beim selben Index wieder öffnen!
+                        fullScreenPostIndex = null
+                        selectedPostIndex = index
+                    }
                 )
             }
         }
@@ -360,7 +365,7 @@ fun FullScreenMediaViewer(
     initialIndex: Int,
     posts: List<ImgurPost>,
     autoReplay: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: (Int) -> Unit // Übergibt den aktuellen Index beim Schließen
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
@@ -369,7 +374,7 @@ fun FullScreenMediaViewer(
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { onDismiss(pagerState.currentPage) },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
@@ -382,6 +387,7 @@ fun FullScreenMediaViewer(
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val post = posts.getOrNull(page) ?: return@HorizontalPager
+                val isCurrentPage = pagerState.currentPage == page
                 var scale by remember { mutableFloatStateOf(1f) }
                 var offsetX by remember { mutableFloatStateOf(0f) }
                 var offsetY by remember { mutableFloatStateOf(0f) }
@@ -413,18 +419,55 @@ fun FullScreenMediaViewer(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (post.isVideo && post.mediaUrl != null) {
-                            if (pagerState.currentPage == page) {
+                        val imgurImages = post.images
+
+                        if (!imgurImages.isNullOrEmpty()) {
+                            // Im Vollbild für Alben das erste oder aktive Bild/Video anzeigen
+                            val firstImg = imgurImages.firstOrNull()
+                            val itemUrl = firstImg?.mp4 ?: firstImg?.link ?: post.mediaUrl
+                            val isItemVideo = (firstImg?.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+
+                            if (isItemVideo && itemUrl != null) {
                                 VideoPlayer(
-                                    videoUrl = post.mediaUrl!!,
+                                    videoUrl = itemUrl,
                                     isMuted = false,
                                     autoReplay = autoReplay,
-                                    autoPlayVideos = autoPlayVideos,
+                                    autoPlayVideos = autoPlayVideos && isCurrentPage,
                                     showControls = true,
                                     modifier = Modifier.fillMaxSize()
                                 )
+                            } else if (itemUrl != null) {
+                                AsyncImage(
+                                    model = itemUrl,
+                                    contentDescription = post.title,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .pointerInput(Unit) {
+                                            detectTapGestures(
+                                                onDoubleTap = {
+                                                    if (scale > 1f) {
+                                                        scale = 1f
+                                                        offsetX = 0f
+                                                        offsetY = 0f
+                                                    } else {
+                                                        scale = 2.5f
+                                                    }
+                                                }
+                                            )
+                                        }
+                                )
                             }
-                        } else {
+                        } else if (post.isVideo && post.mediaUrl != null) {
+                            VideoPlayer(
+                                videoUrl = post.mediaUrl!!,
+                                isMuted = false,
+                                autoReplay = autoReplay,
+                                autoPlayVideos = autoPlayVideos && isCurrentPage,
+                                showControls = true,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else if (post.mediaUrl != null) {
                             AsyncImage(
                                 model = post.mediaUrl,
                                 contentDescription = post.title,
@@ -451,7 +494,7 @@ fun FullScreenMediaViewer(
             }
 
             IconButton(
-                onClick = onDismiss,
+                onClick = { onDismiss(pagerState.currentPage) },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(24.dp)
@@ -560,6 +603,8 @@ fun PostDetailBottomSheet(
                 .background(MaterialTheme.colorScheme.surface)
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
+            // Prüfen, ob diese Seite gerade wirklich aktiv (sichtbar) ist
+            val isCurrentPage = pagerState.currentPage == page
 
             LazyColumn(
                 modifier = Modifier
@@ -622,7 +667,6 @@ fun PostDetailBottomSheet(
                         val imgurImages = post.images
 
                         if (!imgurImages.isNullOrEmpty()) {
-                            // Wenn das Album mehrere Medien enthält, alle nacheinander anzeigen
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -632,11 +676,12 @@ fun PostDetailBottomSheet(
                                     val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
 
                                     if (isItemVideo && itemUrl != null) {
+                                        // Video spielt nur ab, wenn es in der aktuellen Page ist UND die Seite aktiv ist
                                         VideoPlayer(
                                             videoUrl = itemUrl,
                                             isMuted = false,
                                             autoReplay = autoReplay,
-                                            autoPlayVideos = autoPlayVideos,
+                                            autoPlayVideos = autoPlayVideos && isCurrentPage,
                                             showControls = true,
                                             onDoubleClick = { onDoubleClick(page) },
                                             modifier = Modifier
@@ -661,19 +706,17 @@ fun PostDetailBottomSheet(
                                 }
                             }
                         } else if (post.isVideo && post.mediaUrl != null) {
-                            if (pagerState.currentPage == page) {
-                                VideoPlayer(
-                                    videoUrl = post.mediaUrl!!,
-                                    isMuted = false,
-                                    autoReplay = autoReplay,
-                                    autoPlayVideos = autoPlayVideos,
-                                    showControls = true,
-                                    onDoubleClick = { onDoubleClick(page) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(max = 350.dp)
-                                )
-                            }
+                            VideoPlayer(
+                                videoUrl = post.mediaUrl!!,
+                                isMuted = false,
+                                autoReplay = autoReplay,
+                                autoPlayVideos = autoPlayVideos && isCurrentPage,
+                                showControls = true,
+                                onDoubleClick = { onDoubleClick(page) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 350.dp)
+                            )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
                                 model = post.mediaUrl,
