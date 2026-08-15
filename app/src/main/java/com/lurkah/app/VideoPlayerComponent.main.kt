@@ -7,19 +7,18 @@
 package com.lurkah.app
 
 import android.net.Uri
-import android.view.GestureDetector
-import android.view.MotionEvent
 import androidx.compose.runtime.*
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.*
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.*
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 
 @Composable
 fun VideoPlayer(
@@ -54,8 +53,18 @@ fun VideoPlayer(
         }
     }
 
+    // Die Gesten-Erkennung wird sauber über den Compose Modifier geregelt,
+    // das verhindert Konflikte mit dem Android View TouchListener.
     Box(
-        modifier = modifier.background(Color.Transparent)
+        modifier = modifier
+            .background(Color.Transparent)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        currentOnDoubleClick?.invoke()
+                    }
+                )
+            }
     ) {
         AndroidView(
             factory = { ctx ->
@@ -64,29 +73,15 @@ fun VideoPlayer(
                     useController = showControls
                     controllerAutoShow = false
                     hideController()
+
+                    // Korrekter Resize-Mode, der Verzerrungen verhindert
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
 
-                    // Verhindert das schwarze Aufblitzen radikal:
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                     setKeepContentOnPlayerReset(true)
-
-                    val gestureDetector = android.view.GestureDetector(
-                        ctx,
-                        object : android.view.GestureDetector.SimpleOnGestureListener() {
-                            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
-                                currentOnDoubleClick?.invoke()
-                                return true
-                            }
-                        }
-                    )
-
-                    setOnTouchListener { _, event ->
-                        gestureDetector.onTouchEvent(event)
-                        false
-                    }
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.matchParentSize()
         )
     }
 }
