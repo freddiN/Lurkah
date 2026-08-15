@@ -58,11 +58,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val isDarkMode by mainViewModel.isDarkMode.collectAsState()
+            val autoReplay by mainViewModel.autoReplay.collectAsState()
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ImgurAppContent(viewModel = mainViewModel, isDarkMode = isDarkMode)
+                    ImgurAppContent(
+                        viewModel = mainViewModel,
+                        isDarkMode = isDarkMode,
+                        autoReplay = autoReplay
+                    )
                 }
             }
         }
@@ -70,11 +75,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean) {
+fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: Boolean) {
     var currentScreen by remember { mutableStateOf("feed") }
     val blacklistedUsers by viewModel.blacklistedUsers.collectAsState()
 
-    // Fängt die Android-Zurück-Geste ab, wenn die Settings offen sind
     BackHandler(enabled = currentScreen == "settings") {
         currentScreen = "feed"
     }
@@ -82,8 +86,10 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean) {
     if (currentScreen == "settings") {
         SettingsScreen(
             isDarkMode = isDarkMode,
+            autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
+            onAutoReplayToggle = { viewModel.toggleAutoReplay(it) },
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             modifier = Modifier.systemBarsPadding()
@@ -91,6 +97,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean) {
     } else {
         ImgurFeedScreen(
             viewModel = viewModel,
+            autoReplay = autoReplay,
             onOpenSettings = { currentScreen = "settings" }
         )
     }
@@ -99,6 +106,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean) {
 @Composable
 fun ImgurFeedScreen(
     viewModel: MainViewModel,
+    autoReplay: Boolean,
     onOpenSettings: () -> Unit
 ) {
     var selectedPostIndex by remember { mutableStateOf<Int?>(null) }
@@ -210,6 +218,7 @@ fun ImgurFeedScreen(
                 PostDetailBottomSheet(
                     initialIndex = initialIndex,
                     viewModel = viewModel,
+                    autoReplay = autoReplay,
                     onDismiss = { selectedPostIndex = null },
                     onDoubleClick = { index -> fullScreenPostIndex = index }
                 )
@@ -219,6 +228,7 @@ fun ImgurFeedScreen(
                 FullScreenMediaViewer(
                     initialIndex = initialIndex,
                     posts = viewModel.posts,
+                    autoReplay = autoReplay,
                     onDismiss = { fullScreenPostIndex = null }
                 )
             }
@@ -321,6 +331,7 @@ fun SmartMediaCard(
 fun FullScreenMediaViewer(
     initialIndex: Int,
     posts: List<ImgurPost>,
+    autoReplay: Boolean,
     onDismiss: () -> Unit
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
@@ -359,19 +370,6 @@ fun FullScreenMediaViewer(
                                 }
                             }
                         }
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onDoubleTap = {
-                                    if (scale > 1f) {
-                                        scale = 1f
-                                        offsetX = 0f
-                                        offsetY = 0f
-                                    } else {
-                                        scale = 2.5f
-                                    }
-                                }
-                            )
-                        }
                 ) {
                     Box(
                         modifier = Modifier
@@ -389,7 +387,8 @@ fun FullScreenMediaViewer(
                                 VideoPlayer(
                                     videoUrl = post.mediaUrl!!,
                                     isMuted = false,
-                                    showControls = false,
+                                    autoReplay = autoReplay,
+                                    showControls = true,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -398,7 +397,21 @@ fun FullScreenMediaViewer(
                                 model = post.mediaUrl,
                                 contentDescription = post.title,
                                 contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onDoubleTap = {
+                                                if (scale > 1f) {
+                                                    scale = 1f
+                                                    offsetX = 0f
+                                                    offsetY = 0f
+                                                } else {
+                                                    scale = 2.5f
+                                                }
+                                            }
+                                        )
+                                    }
                             )
                         }
                     }
@@ -494,6 +507,7 @@ fun CommentItem(comment: ImgurComment, depth: Int = 0) {
 fun PostDetailBottomSheet(
     initialIndex: Int,
     viewModel: MainViewModel,
+    autoReplay: Boolean,
     onDismiss: () -> Unit,
     onDoubleClick: (Int) -> Unit
 ) {
@@ -542,6 +556,8 @@ fun PostDetailBottomSheet(
                                 VideoPlayer(
                                     videoUrl = post.mediaUrl!!,
                                     isMuted = false,
+                                    autoReplay = autoReplay,
+                                    showControls = true,
                                     onDoubleClick = { onDoubleClick(page) },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -611,6 +627,7 @@ fun PostDetailBottomSheet(
 fun VideoPlayer(
     videoUrl: String,
     isMuted: Boolean,
+    autoReplay: Boolean,
     modifier: Modifier = Modifier,
     showControls: Boolean = true,
     onDoubleClick: (() -> Unit)? = null
@@ -618,18 +635,18 @@ fun VideoPlayer(
     val context = LocalContext.current
     val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
 
-    val exoPlayer = remember(videoUrl) {
+    val exoPlayer = remember(videoUrl, autoReplay) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
-            repeatMode = Player.REPEAT_MODE_OFF
+            repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             volume = if (isMuted) 0f else 1f
-            pauseAtEndOfMediaItems = true
+            pauseAtEndOfMediaItems = !autoReplay
             prepare()
             playWhenReady = true
         }
     }
 
-    DisposableEffect(videoUrl) {
+    DisposableEffect(videoUrl, autoReplay) {
         onDispose {
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
@@ -649,6 +666,7 @@ fun VideoPlayer(
             modifier = Modifier.fillMaxSize()
         )
 
+        // Nur ein transparenter Layer für Doppeltap, der einfache Taps (Controls einblenden) durchlässt
         if (currentOnDoubleClick != null) {
             Box(
                 modifier = Modifier
