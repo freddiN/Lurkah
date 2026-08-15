@@ -30,7 +30,7 @@ android {
     }
     buildTypes {
     release {
-        isMinifyEnabled = true
+        isMinifyEnabled = false
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         // Signiert die Release-Version mit dem Standard-Debug-Key, damit sie installierbar ist:
         signingConfig = signingConfigs.getByName("debug") 
