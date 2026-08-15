@@ -7,6 +7,7 @@ package com.viralgur.app
 
 import android.net.Uri
 import android.os.Bundle
+import android.view.TextureView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -670,7 +671,9 @@ fun VideoPlayer(
                     player = exoPlayer
                     useController = showControls
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    setSurfaceType(PlayerView.SURFACE_TYPE_TEXTURE_VIEW)
+                    // Nutzen einer direkten TextureView via PlayerView-Zuweisung um das Aufblitzen zu verhindern
+                    val textureView = TextureView(ctx)
+                    setVideoTextureView(textureView)
                 }
             },
             modifier = Modifier.fillMaxSize()
