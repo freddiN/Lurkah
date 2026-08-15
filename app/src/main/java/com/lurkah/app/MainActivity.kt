@@ -438,7 +438,7 @@ fun FullScreenMediaViewer(
                                 )
                             } else if (itemUrl != null) {
                                 AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current))
+                                    model = ImageRequest.Builder(LocalContext.current)
                                         .data(itemUrl)
                                         .crossfade(true)
                                         .diskCachePolicy(CachePolicy.ENABLED)
@@ -474,7 +474,7 @@ fun FullScreenMediaViewer(
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current))
+                                model = ImageRequest.Builder(LocalContext.current)
                                     .data(post.mediaUrl)
                                     .crossfade(true)
                                     .diskCachePolicy(CachePolicy.ENABLED)
@@ -704,7 +704,7 @@ fun PostDetailBottomSheet(
                                         )
                                     } else if (itemUrl != null) {
                                         AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current))
+                                            model = ImageRequest.Builder(LocalContext.current)
                                                 .data(itemUrl)
                                                 .crossfade(true)
                                                 .diskCachePolicy(CachePolicy.ENABLED)
@@ -738,7 +738,7 @@ fun PostDetailBottomSheet(
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current))
+                                model = ImageRequest.Builder(LocalContext.current)
                                     .data(post.mediaUrl)
                                     .crossfade(true)
                                     .diskCachePolicy(CachePolicy.ENABLED)
@@ -805,6 +805,7 @@ fun VideoPlayer(
     videoUrl: String,
     isMuted: Boolean,
     autoReplay: Boolean,
+    autoPlayVideos: Boolean, // <--- Dieser Parameter hat gefehlt!
     modifier: Modifier = Modifier,
     showControls: Boolean = true,
     onDoubleClick: (() -> Unit)? = null
