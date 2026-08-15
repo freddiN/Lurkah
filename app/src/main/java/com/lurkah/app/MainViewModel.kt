@@ -32,7 +32,7 @@ data class ImgurPost(
     @SerializedName("account_url") val accountUrl: String?,
     val images: List<ImgurImage>?,
     @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList(),
-    val size: Long? // <--- Neu: Erfasst die Dateigröße bei Einzelposts
+    val size: Long?
 ) {
     val tags: List<String>
         get() = rawTags?.map { it.name } ?: emptyList()
@@ -120,15 +120,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val clientId = "Client-ID 546c25a59c58ad7"
     private val settingsManager = SettingsManager(application)
 
-    // --- NEU: Error State für UI-Feedback ---
+    // Retrofit Setup
+    private val retrofit = Retrofit.Builder()
+        .baseUrl("https://api.imgur.com/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    val api: ImgurApiService = retrofit.create(ImgurApiService::class.java)
+
+    // Exposed Settings Flows
+    val isDarkMode: StateFlow<Boolean> = settingsManager.isDarkMode
+        .stateIn(viewModelScope, SharingStarted.Lazily, true)
+
+    val autoPlayVideos: StateFlow<Boolean> = settingsManager.autoPlayVideos
+        .stateIn(viewModelScope, SharingStarted.Lazily, true)
+
+    val autoReplay: StateFlow<Boolean> = settingsManager.autoReplay
+        .stateIn(viewModelScope, SharingStarted.Lazily, true)
+
+    val blacklistedUsers: StateFlow<Set<String>> = settingsManager.blacklistedUsers
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
+
+    val blacklistedTags: StateFlow<Set<String>> = settingsManager.blacklistedTags
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
+
+    // UI States
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
     fun clearError() {
         errorMessage = null
     }
-
-    // ... (bisherige Flows für autoPlayVideos, autoReplay, isDarkMode, etc.)
 
     var posts = mutableStateListOf<ImgurPost>()
         private set
@@ -187,7 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (isRefresh) {
                         posts.clear()
                     }
-                    val existingIds = posts.map { it.id }.toSet()
+                    val existingIds = posts.map { id }.toSet()
                     val newUniquePosts = filtered.filter { !existingIds.contains(it.id) }
 
                     posts.addAll(newUniquePosts)
@@ -227,6 +249,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsManager.setDarkMode(enabled) }
     }
 
+    fun toggleAutoPlayVideos(enabled: Boolean) {
+        viewModelScope.launch { settingsManager.setAutoPlayVideos(enabled) }
+    }
+
+    fun toggleAutoPlay(enabled: Boolean) {
+        viewModelScope.launch { settingsManager.setAutoReplay(enabled) }
+    }
+
     fun addBlacklistUser(username: String) {
         viewModelScope.launch { settingsManager.addBlacklistedUser(username) }
     }
@@ -245,16 +275,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadFullAlbumDetails(postId: String, indexInList: Int) {
         val post = posts.getOrNull(indexInList) ?: return
-        // Wenn schon Bilder da sind oder es kein Album ist, abbrechen
-        if (post.images.isNullOrEmpty() || post.images.size > 3) return
+        if (post.images.isNullOrEmpty() || (post.images?.size ?: 0) > 1) return
 
         viewModelScope.launch {
             try {
                 val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
                 if (response.success && !response.data.images.isNullOrEmpty()) {
-                    // Ersetze das Post-Objekt in der Liste mit der vollen Bilderrate
-                    val updatedPost = post.copy(images = response.data.images)
-                    posts[indexInList] = updatedPost
+                    if (response.data.images!!.size != post.images?.size) {
+                        val updatedPost = post.copy(images = response.data.images)
+                        posts[indexInList] = updatedPost
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
