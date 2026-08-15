@@ -153,8 +153,13 @@ fun ImgurFeedScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ViralGur") },
+                title = { Text("Lurkah") },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.loadViralPosts(isRefresh = true) }
+                    ) {
+                        Text("🔄", fontSize = 18.sp)
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Text("⚙️", fontSize = 18.sp)
                     }
@@ -229,7 +234,10 @@ fun ImgurFeedScreen(
                     viewModel = viewModel,
                     autoReplay = autoReplay,
                     onDismiss = { selectedPostIndex = null },
-                    onDoubleClick = { index -> fullScreenPostIndex = index }
+                    onDoubleClick = { index ->
+                        selectedPostIndex = null // <-- NEU: Schließt das Bottom-Sheet
+                        fullScreenPostIndex = index
+                    }
                 )
             }
 
@@ -681,6 +689,9 @@ fun VideoPlayer(
     val context = LocalContext.current
     val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
 
+    // Referenz auf den PlayerView, um die Controls manuell ein-/auszublenden
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+
     val exoPlayer = remember(videoUrl, autoReplay) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
@@ -709,24 +720,48 @@ fun VideoPlayer(
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = showControls
+                    controllerAutoShow = false // Startet OHNE sichtbare Controls
+                    hideController()           // Versteckt sie initial
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    // Workaround entfernen, wenn es Probleme macht:
-                    // setEnableComposeSurfaceSyncWorkaround(true)
+
+                    playerView = this // Referenz für unser Klick-Overlay speichern
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        if (currentOnDoubleClick != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = { currentOnDoubleClick?.invoke() }
-                        )
-                    }
-            )
-        }
+        // Ein durchgehendes Touch-Overlay, das unsere Klicks sauber verwaltet
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (currentOnDoubleClick != null) {
+                                // Ruft den Vollbildmodus auf (BottomSheet)
+                                currentOnDoubleClick?.invoke()
+                            } else {
+                                // FALLS DU WIRKLICH willst, dass im Vollbild ein
+                                // Doppelklick die Controls steuert (statt normaler Klick):
+                                /*
+                                playerView?.let { pv ->
+                                    if (pv.isControllerFullyVisible) pv.hideController() else pv.showController()
+                                }
+                                */
+                            }
+                        },
+                        onTap = {
+                            // EINFACHER KLICK: Controls ein/ausblenden
+                            playerView?.let { pv ->
+                                if (pv.isControllerFullyVisible) {
+                                    pv.hideController()
+                                } else {
+                                    pv.showController()
+                                }
+                            }
+                        }
+                    )
+                }
+        )
     }
 }
