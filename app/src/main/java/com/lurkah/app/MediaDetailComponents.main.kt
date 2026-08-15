@@ -46,17 +46,25 @@ fun PostDetailBottomSheet(
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { viewModel.posts.size })
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
+    // Lädt Kommentare und Album-Details NUR beim ersten Erreichen der Seite und bricht danach ab,
+    // um jegliche Loops oder Feed-Updates zu verhindern.
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             viewModel.loadCommentsForPost(post.id)
-            viewModel.loadFullAlbumDetails(post.id, pagerState.currentPage)
+            if (post.images.isNullOrEmpty() && !post.mediaUrl.isNullOrEmpty()) {
+                viewModel.loadFullAlbumDetails(post.id, pagerState.currentPage)
+            }
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.9f)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxHeight(0.9f)
+    ) {
         HorizontalPager(
             state = pagerState,
+            beyondViewportPageCount = 1, // Hält benachbarte Seiten im Speicher, verhindert schwarze Bildschirme beim Swipen
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
@@ -117,7 +125,6 @@ fun PostDetailBottomSheet(
                         )
                     }
 
-                    // Fester Container, der verhindert, dass die LazyColumn das Layout beim Laden kollabieren lässt
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -136,7 +143,7 @@ fun PostDetailBottomSheet(
                                         videoUrl = itemUrl,
                                         isMuted = false,
                                         autoReplay = autoReplay,
-                                        autoPlayVideos = autoPlayVideos && isCurrentPage,
+                                        autoPlayVideos = autoPlayVideos && isCurrentPage, // Spielt nur in der aktiven Seite
                                         showControls = true,
                                         onDoubleClick = { onDoubleClick(page) },
                                         modifier = Modifier
