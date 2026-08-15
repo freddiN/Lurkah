@@ -614,8 +614,6 @@ fun PostDetailBottomSheet(
         }
     }
 
-    // Verwende standardmäßig 'sheetState' oder eine feste, sichere Layout-Vorgabe,
-    // damit die Ansicht nicht dynamisch einknickt.
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -686,13 +684,11 @@ fun PostDetailBottomSheet(
                         )
                     }
 
-                    // Stabiler Container mit fester Vorab-Höhe für das Medium
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(350.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
+                            .wrapContentHeight()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp))
                     ) {
                         val displayItems = remember(currentImages, post.mediaUrl, post.id) {
                             val rawList = if (!currentImages.isNullOrEmpty()) {
@@ -719,19 +715,27 @@ fun PostDetailBottomSheet(
                         }
 
                         if (displayItems.isEmpty()) {
-                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(250.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                            }
                         } else {
                             Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 displayItems.forEachIndexed { imgIndex, img ->
+                                    val shouldPlayVideo = isCurrentPage && imgIndex == 0
+
                                     DetailMediaItem(
                                         img = img,
                                         imgIndex = imgIndex,
                                         post = post,
-                                        isCurrentPage = isCurrentPage,
+                                        isCurrentPage = shouldPlayVideo,
                                         autoReplay = autoReplay,
                                         autoPlayVideos = autoPlayVideos,
                                         onDoubleClick = { currentPos ->
@@ -739,7 +743,11 @@ fun PostDetailBottomSheet(
                                         },
                                         onPlayerReady = { player ->
                                             if (player != null) {
-                                                activePlayer = player
+                                                if (!shouldPlayVideo) {
+                                                    player.playWhenReady = false
+                                                } else {
+                                                    activePlayer = player
+                                                }
                                             }
                                         }
                                     )
