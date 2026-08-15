@@ -24,14 +24,12 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -271,16 +269,7 @@ fun ImgurFeedScreen(
     var accountToBlacklist by remember { mutableStateOf<String?>(null) }
     var showBlacklistDialog by remember { mutableStateOf(false) }
 
-    val pullToRefreshState = rememberPullToRefreshState()
     val gridState = rememberLazyGridState()
-
-    if (pullToRefreshState.isRefreshing) {
-        LaunchedEffect(true) { viewModel.loadViralPosts(isRefresh = true) }
-    }
-
-    LaunchedEffect(viewModel.isRefreshing) {
-        if (!viewModel.isRefreshing) pullToRefreshState.endRefresh()
-    }
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -314,11 +303,12 @@ fun ImgurFeedScreen(
             )
         }
     ) { padding ->
-        Box(
+        PullToRefreshBox(
+            isRefreshing = viewModel.isRefreshing,
+            onRefresh = { viewModel.loadViralPosts(isRefresh = true) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .nestedScroll(pullToRefreshState.nestedScrollConnection)
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -351,11 +341,6 @@ fun ImgurFeedScreen(
                     }
                 }
             }
-
-            PullToRefreshContainer(
-                state = pullToRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
 
             accountToBlacklist?.let { author ->
                 AlertDialog(
@@ -542,7 +527,8 @@ fun FullScreenMediaViewer(
     posts: List<ImgurPost>,
     onDismiss: () -> Unit
 ) {
-    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { posts.size })
+    val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
+    val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -557,7 +543,7 @@ fun FullScreenMediaViewer(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                val post = posts[page]
+                val post = posts.getOrNull(page) ?: return@HorizontalPager
                 var scale by remember { mutableFloatStateOf(1f) }
                 var offsetX by remember { mutableFloatStateOf(0f) }
                 var offsetY by remember { mutableFloatStateOf(0f) }
@@ -715,7 +701,8 @@ fun PostDetailBottomSheet(
     onDismiss: () -> Unit,
     onDoubleClick: (Int) -> Unit
 ) {
-    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { viewModel.posts.size })
+    val safeInitialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0))
+    val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { viewModel.posts.size })
 
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
@@ -727,7 +714,7 @@ fun PostDetailBottomSheet(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
-            val post = viewModel.posts[page]
+            val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
 
             LazyColumn(
                 modifier = Modifier
@@ -854,22 +841,28 @@ fun VideoPlayer(
         }
     }
 
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = showControls
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            }
-        },
-        modifier = modifier.then(
-            if (currentOnDoubleClick != null) {
-                Modifier.pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = { currentOnDoubleClick?.invoke() }
-                    )
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = showControls
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
-            } else Modifier
+            },
+            modifier = Modifier.fillMaxSize()
         )
-    )
+
+        if (currentOnDoubleClick != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { currentOnDoubleClick?.invoke() }
+                        )
+                    }
+            )
+        }
+    }
 }
