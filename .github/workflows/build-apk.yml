@@ -24,15 +24,17 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Build Debug APK
-        run: gradle assembleDebug
+      # Befehl auf Release geändert
+      - name: Build Release APK
+        run: gradle assembleRelease
 
-      # NEU: Benennt die erzeugte APK vor dem Hochladen um
+      # Pfad auf Release geändert
       - name: Rename APK
-        run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/viralgur.apk
+        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/viralgur.apk
 
+      # Pfad auf Release geändert
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Viralgur-App-APK
-          path: app/build/outputs/apk/debug/viralgur.apk
+          path: app/build/outputs/apk/release/viralgur.apk
