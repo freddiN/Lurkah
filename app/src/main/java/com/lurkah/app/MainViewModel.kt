@@ -190,7 +190,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadViralPosts(isRefresh: Boolean = false) {
-        if (isLoadingMore) return
+        if (isLoadingMore && !isRefresh) return
 
         viewModelScope.launch {
             if (isRefresh) {
@@ -205,6 +205,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (response.success) {
                     val currentBlacklist = blacklistedUsers.value.map { it.lowercase() }
                     val currentBlacklistTags = blacklistedTags.value.map { it.lowercase() }
+
                     val filtered = response.data.filter { post ->
                         val author = post.accountUrl?.lowercase() ?: ""
                         val hasBlockedTag = post.tags.any { currentBlacklistTags.contains(it.lowercase()) }
@@ -212,10 +213,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         !currentBlacklist.contains(author) && !hasBlockedTag && post.mediaUrl != null
                     }
 
+                    // Threadsicheres Aktualisieren der Compose StateList
                     if (isRefresh) {
                         posts.clear()
                     }
-                    posts.addAll(filtered)
+                    // Duplikate vermeiden, falls die API Seiten doppelt liefert
+                    val existingIds = posts.map { it.id }.toSet()
+                    val newUniquePosts = filtered.filter { !existingIds.contains(it.id) }
+
+                    posts.addAll(newUniquePosts)
                     currentPage++
                 }
             } catch (e: Exception) {
