@@ -66,7 +66,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Auto-Play Videos", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "videos start playing automatically when visible",
+                            "Videos start playing automatically",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -85,7 +85,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Auto Replay Videos", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "videos automatically start from the beginning",
+                            "Videos automatically restart from the beginning",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -97,7 +97,7 @@ fun SettingsScreen(
 
                 // --- BLOCKIERTE ACCOUNTS ---
                 Text(
-                    text = "blocked accounts",
+                    text = "Blocked Accounts",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -106,7 +106,7 @@ fun SettingsScreen(
 
                 if (blacklistedUsers.isEmpty()) {
                     Text(
-                        text = "no accounts blocked.",
+                        text = "No accounts blocked.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -143,7 +143,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "blocked tags",
+                    text = "Blocked tags",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -152,7 +152,7 @@ fun SettingsScreen(
 
                 if (blacklistedTags.isEmpty()) {
                     Text(
-                        text = "no tags blocked.",
+                        text = "No tags blocked.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

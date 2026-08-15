@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.viralgur.app"
+    namespace = "com.lurkah.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.viralgur.app"
+        applicationId = "com.lurkah.app"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
