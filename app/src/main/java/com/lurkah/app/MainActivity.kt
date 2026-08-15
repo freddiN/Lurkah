@@ -619,7 +619,48 @@ fun PostDetailBottomSheet(
                             .fillMaxWidth()
                             .wrapContentHeight()
                     ) {
-                        if (post.isVideo && post.mediaUrl != null) {
+                        val imgurImages = post.images
+
+                        if (!imgurImages.isNullOrEmpty()) {
+                            // Wenn das Album mehrere Medien enthält, alle nacheinander anzeigen
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                imgurImages.forEachIndexed { imgIndex, img ->
+                                    val itemUrl = img.mp4 ?: img.link
+                                    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+
+                                    if (isItemVideo && itemUrl != null) {
+                                        VideoPlayer(
+                                            videoUrl = itemUrl,
+                                            isMuted = false,
+                                            autoReplay = autoReplay,
+                                            autoPlayVideos = autoPlayVideos,
+                                            showControls = true,
+                                            onDoubleClick = { onDoubleClick(page) },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(max = 350.dp)
+                                        )
+                                    } else if (itemUrl != null) {
+                                        AsyncImage(
+                                            model = itemUrl,
+                                            contentDescription = "${post.title} - ${imgIndex + 1}",
+                                            contentScale = ContentScale.Fit,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(max = 350.dp)
+                                                .pointerInput(Unit) {
+                                                    detectTapGestures(
+                                                        onDoubleTap = { onDoubleClick(page) }
+                                                    )
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (post.isVideo && post.mediaUrl != null) {
                             if (pagerState.currentPage == page) {
                                 VideoPlayer(
                                     videoUrl = post.mediaUrl!!,
@@ -633,7 +674,7 @@ fun PostDetailBottomSheet(
                                         .heightIn(max = 350.dp)
                                 )
                             }
-                        } else {
+                        } else if (post.mediaUrl != null) {
                             AsyncImage(
                                 model = post.mediaUrl,
                                 contentDescription = post.title,
