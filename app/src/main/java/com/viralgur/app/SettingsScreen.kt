@@ -1,18 +1,17 @@
 package com.viralgur.app
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     isDarkMode: Boolean,
@@ -22,96 +21,74 @@ fun SettingsScreen(
     onRemoveBlacklistUser: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var newUserText by remember { mutableStateOf("") }
-
-    Column(
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings") }
+            )
+        },
         modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineMedium
-        )
-
-        // --- Dark Mode Switch ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
         ) {
-            Text(
-                text = "Dark Mode",
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Switch(
-                checked = isDarkMode,
-                onCheckedChange = onDarkModeToggle
-            )
-        }
-
-        HorizontalDivider()
-
-        // --- Blacklist Management (Users) ---
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = "Blocked Users",
-                style = MaterialTheme.typography.titleMedium
-            )
-
+            // Dark Mode Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                OutlinedTextField(
-                    value = newUserText,
-                    onValueChange = { newUserText = it },
-                    label = { Text("Enter username") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = {
-                        if (newUserText.isNotBlank()) {
-                            val cleanUser = newUserText.trim().removePrefix("@")
-                            onAddBlacklistUser(cleanUser)
-                            newUserText = ""
-                        }
-                    }
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Block user")
-                }
+                Text("Dark Mode", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
             }
 
-            // Blocked users chip list
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Überschrift für blockierte Nutzer
+            Text(
+                text = "Blockierte Accounts",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // Liste der blockierten Nutzer
             if (blacklistedUsers.isEmpty()) {
                 Text(
-                    text = "No users blocked.",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "Keine Accounts blockiert.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(blacklistedUsers.toList()) { user ->
-                        InputChip(
-                            selected = false,
-                            onClick = { },
-                            label = { Text("@$user") },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Remove",
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clickable { onRemoveBlacklistUser(user) }
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    // Liste alphabetisch sortieren für bessere Übersicht
+                    items(blacklistedUsers.toList().sorted()) { user ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "@$user",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            
+                            // Minus-Button zum Entfernen des Nutzers von der Blacklist
+                            IconButton(onClick = { onRemoveBlacklistUser(user) }) {
+                                Text(
+                                    text = "−", 
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-                        )
+                        }
                     }
                 }
             }
