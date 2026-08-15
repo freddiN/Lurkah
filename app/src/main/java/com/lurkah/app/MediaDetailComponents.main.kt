@@ -150,12 +150,15 @@ fun PostDetailBottomSheet(
                                         )
                                     } else if (itemUrl != null) {
                                         AsyncImage(
-                                            model = itemUrl,
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(itemUrl)
+                                                .crossfade(true)
+                                                .build(),
                                             contentDescription = "${post.title} - ${imgIndex + 1}",
                                             contentScale = ContentScale.Fit,
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .heightIn(max = 350.dp)
+                                                .heightIn(min = 250.dp, max = 350.dp) // WICHTIG: min-height verhindert das Zusammenfallen
                                                 .pointerInput(Unit) {
                                                     detectTapGestures(
                                                         onDoubleTap = { onDoubleClick(page) }
@@ -184,7 +187,7 @@ fun PostDetailBottomSheet(
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 350.dp)
+                                    .heightIn(min = 250.dp, max = 350.dp)
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { onDoubleClick(page) }

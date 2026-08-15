@@ -47,15 +47,15 @@ fun VideoPlayer(
 
     DisposableEffect(videoUrl, autoReplay, autoPlayVideos) {
         onDispose {
-            exoPlayer.pause()
-            exoPlayer.clearVideoSurface() // Wichtig: Trennt die Oberfläche, verhindert den schwarzen Aufblitzeffekt
+            exoPlayer.stop()
+            exoPlayer.clearVideoSurface()
             exoPlayer.clearMediaItems()
             exoPlayer.release()
         }
     }
 
     Box(
-        modifier = modifier.background(Color.Transparent) // Auf Transparent setzen statt Surface-Farbe
+        modifier = modifier.background(Color.Transparent)
     ) {
         AndroidView(
             factory = { ctx ->
@@ -66,8 +66,9 @@ fun VideoPlayer(
                     hideController()
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
 
-                    // Verhindert das schwarze Aufblitzen des Standard-Shutters vom PlayerView
+                    // Verhindert das schwarze Aufblitzen radikal:
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    setKeepContentOnPlayerReset(true)
 
                     val gestureDetector = android.view.GestureDetector(
                         ctx,

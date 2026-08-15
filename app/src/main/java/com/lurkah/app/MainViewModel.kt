@@ -50,8 +50,19 @@ data class ImgurPost(
     val isGif: Boolean
         get() = mainMedia?.type == "image/gif" || mediaUrl?.endsWith(".gif") == true
 
+    // FIX: Verbesserte Dateigrößen-Ermittlung (durchsucht alle Bilder/Videos im Post nach einem gültigen Wert)
     val sizeInBytes: Long
-        get() = mainMedia?.size ?: 0L
+        get() {
+            if (mainMedia?.size != null && mainMedia.size > 0L) {
+                return mainMedia.size
+            }
+            images?.forEach { img ->
+                if (img.size != null && img.size > 0L) {
+                    return img.size
+                }
+            }
+            return 0L
+        }
 
     val formattedSize: String
         get() {
