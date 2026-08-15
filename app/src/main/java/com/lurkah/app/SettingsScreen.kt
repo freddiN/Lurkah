@@ -22,9 +22,7 @@ fun SettingsScreen(
     onDarkModeToggle: (Boolean) -> Unit,
     onAutoPlayVideosToggle: (Boolean) -> Unit,
     onAutoReplayToggle: (Boolean) -> Unit,
-    onAddBlacklistUser: (String) -> Unit,
     onRemoveBlacklistUser: (String) -> Unit,
-    onAddBlacklistTag: (String) -> Unit,
     onRemoveBlacklistTag: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -36,17 +34,13 @@ fun SettingsScreen(
         },
         modifier = modifier
     ) { padding ->
-        // Alles in einer einzigen LazyColumn, damit die gesamte Seite scrollbar ist
-        // und es keine Abstürze gibt, wenn beide Listen lang werden.
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // --- EINSTELLUNGEN ---
             item {
-                // Dark Mode Toggle
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -76,7 +70,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Auto Replay Toggle
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -95,7 +88,6 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // --- BLOCKIERTE ACCOUNTS ---
                 Text(
                     text = "Blocked Accounts",
                     style = MaterialTheme.typography.titleMedium,
@@ -113,7 +105,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Die Liste der Accounts
             items(blacklistedUsers.toList().sorted()) { user ->
                 Row(
                     modifier = Modifier
@@ -138,7 +129,6 @@ fun SettingsScreen(
                 }
             }
 
-            // --- BLOCKIERTE TAGS ---
             item {
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -159,7 +149,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Die Liste der Tags
             items(blacklistedTags.toList().sorted()) { tag ->
                 Row(
                     modifier = Modifier

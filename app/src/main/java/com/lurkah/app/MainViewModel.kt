@@ -282,7 +282,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
                 if (response.success && !response.data.images.isNullOrEmpty()) {
-                    albumImagesCache[postId] = response.data.images!!
+                    // Warnung behoben: Kein '!!' notwendig, da durch isNullOrEmpty() bereits als non-null smart-gecastet
+                    albumImagesCache[postId] = response.data.images
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

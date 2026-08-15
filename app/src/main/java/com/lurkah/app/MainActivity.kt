@@ -1,8 +1,8 @@
 @file:OptIn(
     androidx.compose.foundation.ExperimentalFoundationApi::class,
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
-    androidx.media3.common.util.UnstableApi::class
+    androidx.compose.material3.ExperimentalMaterial3Api::class
 )
+@file:Suppress("UnstableApiUsage")
 
 package com.lurkah.app
 
@@ -105,9 +105,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
             onAutoPlayVideosToggle = { viewModel.toggleAutoPlayVideos(it) },
             onAutoReplayToggle = { viewModel.toggleAutoPlay(it) },
-            onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
-            onAddBlacklistTag = { viewModel.addBlacklistTag(it) },
             onRemoveBlacklistTag = { viewModel.removeBlacklistTag(it) },
             modifier = Modifier.systemBarsPadding()
         )
@@ -612,28 +610,31 @@ fun PostDetailBottomSheet(
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             viewModel.loadCommentsForPost(post.id)
-            viewModel.loadFullAlbumDetails(post.id) // Lädt Album-Bilder in den Cache, ohne die Posts-Liste zu stören
+            viewModel.loadFullAlbumDetails(post.id)
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.9f)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxHeight(0.92f)
+    ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .weight(1f) // Wichtig: Damit der Pager den verfügbaren Platz ausfüllt und nicht kollabiert
                 .background(MaterialTheme.colorScheme.surface)
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
             val isCurrentPage = pagerState.currentPage == page
 
-            // Nutzen des Caches für Album-Bilder, falls vorhanden, sonst Fallback auf das initiale Post-Bild
             val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
 
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(bottom = 32.dp)
+                contentPadding = PaddingValues(bottom = 48.dp)
             ) {
                 item {
                     Text(
@@ -682,10 +683,12 @@ fun PostDetailBottomSheet(
                         )
                     }
 
+                    // Fester Container für Medien, damit das Layout beim Laden stabil bleibt
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .wrapContentHeight()
+                            .heightIn(min = 200.dp, max = 450.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp))
                     ) {
                         val displayItems = remember(currentImages, post.mediaUrl) {
                             val rawList = if (!currentImages.isNullOrEmpty()) {
@@ -711,27 +714,33 @@ fun PostDetailBottomSheet(
                             }
                         }
 
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            displayItems.forEachIndexed { imgIndex, img ->
-                                DetailMediaItem(
-                                    img = img,
-                                    imgIndex = imgIndex,
-                                    post = post,
-                                    isCurrentPage = isCurrentPage,
-                                    autoReplay = autoReplay,
-                                    autoPlayVideos = autoPlayVideos,
-                                    onDoubleClick = { currentPos ->
-                                        onDoubleClick(page, currentPos)
-                                    },
-                                    onPlayerReady = { player ->
-                                        if (player != null) {
-                                            activePlayer = player
+                        if (displayItems.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                displayItems.forEachIndexed { imgIndex, img ->
+                                    DetailMediaItem(
+                                        img = img,
+                                        imgIndex = imgIndex,
+                                        post = post,
+                                        isCurrentPage = isCurrentPage,
+                                        autoReplay = autoReplay,
+                                        autoPlayVideos = autoPlayVideos,
+                                        onDoubleClick = { currentPos ->
+                                            onDoubleClick(page, currentPos)
+                                        },
+                                        onPlayerReady = { player ->
+                                            if (player != null) {
+                                                activePlayer = player
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
