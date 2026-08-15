@@ -357,6 +357,9 @@ fun FullScreenMediaViewer(
     val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
 
+    val viewModel: MainViewModel = viewModel()
+    val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -408,6 +411,7 @@ fun FullScreenMediaViewer(
                                     videoUrl = post.mediaUrl!!,
                                     isMuted = false,
                                     autoReplay = autoReplay,
+                                    autoPlayVideos = autoPlayVideos,
                                     showControls = true,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -568,7 +572,6 @@ fun PostDetailBottomSheet(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-// --- TAGS MIT BESTÄTIGUNGS-DIALOG ---
                     var tagToBlock by remember { mutableStateOf<String?>(null) }
 
                     if (post.tags.isNotEmpty()) {
@@ -585,7 +588,6 @@ fun PostDetailBottomSheet(
                         }
                     }
 
-                    // Bestätigungs-Dialog für das Blockieren von Tags
                     tagToBlock?.let { tag ->
                         AlertDialog(
                             onDismissRequest = { tagToBlock = null },
@@ -614,6 +616,7 @@ fun PostDetailBottomSheet(
                                     videoUrl = post.mediaUrl!!,
                                     isMuted = false,
                                     autoReplay = autoReplay,
+                                    autoPlayVideos = autoPlayVideos,
                                     showControls = true,
                                     onDoubleClick = { onDoubleClick(page) },
                                     modifier = Modifier
@@ -685,6 +688,7 @@ fun VideoPlayer(
     videoUrl: String,
     isMuted: Boolean,
     autoReplay: Boolean,
+    autoPlayVideos: Boolean,
     modifier: Modifier = Modifier,
     showControls: Boolean = true,
     onDoubleClick: (() -> Unit)? = null
@@ -692,7 +696,7 @@ fun VideoPlayer(
     val context = LocalContext.current
     val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
 
-    val exoPlayer = remember(videoUrl, autoReplay) {
+    val exoPlayer = remember(videoUrl, autoReplay, autoPlayVideos) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
             repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
