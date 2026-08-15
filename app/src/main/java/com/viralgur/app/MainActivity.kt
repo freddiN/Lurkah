@@ -39,8 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -49,225 +48,54 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import com.google.gson.annotations.SerializedName
-import kotlinx.coroutines.launch
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.GET
-import retrofit2.http.Header
-import retrofit2.http.Path
-import java.util.Locale
 
-// --- DATA MODELS ---
-data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
-data class ImgurCommentsResponse(val data: List<ImgurComment>, val success: Boolean)
-
-data class ImgurPost(
-    val id: String,
-    val title: String,
-    @SerializedName("account_url") val accountUrl: String?,
-    val images: List<ImgurImage>?
-) {
-    private val mainMedia: ImgurImage? get() = images?.firstOrNull()
-
-    val mediaUrl: String?
-        get() = mainMedia?.mp4 ?: mainMedia?.link ?: if (images == null) "https://i.imgur.com/$id.mp4" else null
-
-    val thumbnailUrl: String
-        get() = "https://i.imgur.com/${mainMedia?.id ?: id}m.jpg"
-
-    val isVideo: Boolean
-        get() = (mainMedia?.type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true
-
-    val isGif: Boolean
-        get() = mainMedia?.type == "image/gif" || mediaUrl?.endsWith(".gif") == true
-
-    val sizeInBytes: Long
-        get() = mainMedia?.size ?: 0L
-
-    val formattedSize: String
-        get() {
-            if (sizeInBytes <= 0) return "unknown"
-            val kb = sizeInBytes / 1024.0
-            val mb = kb / 1024.0
-            return if (mb >= 1.0) {
-                String.format(Locale.US, "%.1f MB", mb)
-            } else {
-                String.format(Locale.US, "%.0f KB", kb)
-            }
-        }
-
-    val typeLabel: String
-        get() = when {
-            isVideo -> "🎥 MP4"
-            isGif -> "🎞️ GIF"
-            else -> "🖼️ IMAGE"
-        }
-}
-
-data class ImgurImage(
-    val id: String,
-    val link: String,
-    val mp4: String?,
-    val type: String?,
-    val size: Long?
-)
-
-data class ImgurComment(
-    val id: Long,
-    val comment: String,
-    val author: String,
-    val ups: Int,
-    val downs: Int,
-    val children: List<ImgurComment>? = emptyList()
-)
-
-// --- API SERVICE ---
-interface ImgurApiService {
-    @GET("3/gallery/hot/viral/{page}")
-    suspend fun getMostViral(
-        @Header("Authorization") authHeader: String,
-        @Path("page") page: Int = 0
-    ): ImgurResponse
-
-    @GET("3/gallery/{galleryHash}/comments/best")
-    suspend fun getComments(
-        @Header("Authorization") authHeader: String,
-        @Path("galleryHash") galleryHash: String
-    ): ImgurCommentsResponse
-}
-
-// --- VIEWMODEL ---
-class ImgurViewModel : ViewModel() {
-    private val clientId = "Client-ID 546c25a59c58ad7"
-
-    private val api: ImgurApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl("https://api.imgur.com/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ImgurApiService::class.java)
-    }
-
-    var posts = mutableStateListOf<ImgurPost>()
-        private set
-
-    var blacklistedAccounts = mutableStateListOf<String>()
-        private set
-
-    var selectedPostComments = mutableStateListOf<ImgurComment>()
-        private set
-
-    var isRefreshing by mutableStateOf(false)
-        private set
-
-    var isLoadingMore by mutableStateOf(false)
-        private set
-
-    var isLoadingComments by mutableStateOf(false)
-        private set
-
-    private var currentPage = 0
-
-    init {
-        loadViralPosts(isRefresh = true)
-    }
-
-    fun loadViralPosts(isRefresh: Boolean = false) {
-        if (isLoadingMore) return
-
-        viewModelScope.launch {
-            if (isRefresh) {
-                isRefreshing = true
-                currentPage = 0
-            } else {
-                isLoadingMore = true
-            }
-
-            try {
-                val response = api.getMostViral(authHeader = clientId, page = currentPage)
-                if (response.success) {
-                    val filtered = response.data.filter { post ->
-                        val author = post.accountUrl?.lowercase() ?: ""
-                        !blacklistedAccounts.map { it.lowercase() }.contains(author) && post.mediaUrl != null
-                    }
-
-                    if (isRefresh) {
-                        posts.clear()
-                    }
-                    posts.addAll(filtered)
-                    currentPage++
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                isRefreshing = false
-                isLoadingMore = false
-            }
-        }
-    }
-
-    fun loadCommentsForPost(postId: String) {
-        viewModelScope.launch {
-            isLoadingComments = true
-            selectedPostComments.clear()
-            try {
-                val response = api.getComments(authHeader = clientId, galleryHash = postId)
-                if (response.success) {
-                    selectedPostComments.addAll(response.data)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                isLoadingComments = false
-            }
-        }
-    }
-
-    fun addAccountToBlacklist(accountName: String) {
-        if (accountName.isNotBlank() && !blacklistedAccounts.contains(accountName)) {
-            blacklistedAccounts.add(accountName)
-            loadViralPosts(isRefresh = true)
-        }
-    }
-
-    fun removeAccountFromBlacklist(accountName: String) {
-        blacklistedAccounts.remove(accountName)
-        loadViralPosts(isRefresh = true)
-    }
-}
-
-// --- MAIN ACTIVITY ---
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var isDarkMode by remember { mutableStateOf(true) }
+            val mainViewModel: MainViewModel = viewModel()
+            val isDarkMode by mainViewModel.isDarkMode.collectAsState()
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ImgurFeedScreen(
-                        isDarkMode = isDarkMode,
-                        onToggleDarkMode = { isDarkMode = !isDarkMode }
-                    )
+                    ImgurAppContent(viewModel = mainViewModel, isDarkMode = isDarkMode)
                 }
             }
         }
     }
 }
 
-// --- UI COMPONENTS ---
+@Composable
+fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean) {
+    var currentScreen by remember { mutableStateOf("feed") }
+    val blacklistedUsers by viewModel.blacklistedUsers.collectAsState()
+
+    if (currentScreen == "settings") {
+        SettingsScreen(
+            isDarkMode = isDarkMode,
+            blacklistedUsers = blacklistedUsers,
+            onDarkModeToggle = { viewModel.toggleDarkMode(it) },
+            onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
+            onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
+            modifier = Modifier.systemBarsPadding()
+        )
+    } else {
+        ImgurFeedScreen(
+            viewModel = viewModel,
+            onOpenSettings = { currentScreen = "settings" }
+        )
+    }
+}
+
 @Composable
 fun ImgurFeedScreen(
-    isDarkMode: Boolean,
-    onToggleDarkMode: () -> Unit,
-    viewModel: ImgurViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    viewModel: MainViewModel,
+    onOpenSettings: () -> Unit
 ) {
     var selectedPostIndex by remember { mutableStateOf<Int?>(null) }
     var fullScreenPostIndex by remember { mutableStateOf<Int?>(null) }
-    var accountToBlacklist by remember { mutableStateOf<String?>(null) }
-    var showBlacklistDialog by remember { mutableStateOf(false) }
+    var userToBlock by remember { mutableStateOf<String?>(null) }
 
     val gridState = rememberLazyGridState()
 
@@ -290,14 +118,8 @@ fun ImgurFeedScreen(
             TopAppBar(
                 title = { Text("ViralGur") },
                 actions = {
-                    IconButton(onClick = onToggleDarkMode) {
-                        Text(
-                            text = if (isDarkMode) "☀️" else "🌙",
-                            fontSize = 18.sp
-                        )
-                    }
-                    TextButton(onClick = { showBlacklistDialog = true }) {
-                        Text("🚫 (${viewModel.blacklistedAccounts.size})")
+                    IconButton(onClick = onOpenSettings) {
+                        Text("⚙️", fontSize = 18.sp)
                     }
                 }
             )
@@ -324,7 +146,7 @@ fun ImgurFeedScreen(
                         post = post,
                         onClick = { selectedPostIndex = index },
                         onDoubleClick = { fullScreenPostIndex = index },
-                        onAccountClick = { author -> accountToBlacklist = author }
+                        onAccountClick = { author -> userToBlock = author }
                     )
                 }
 
@@ -342,27 +164,20 @@ fun ImgurFeedScreen(
                 }
             }
 
-            accountToBlacklist?.let { author ->
+            userToBlock?.let { author ->
                 AlertDialog(
-                    onDismissRequest = { accountToBlacklist = null },
-                    title = { Text("Block Account?") },
-                    text = { Text("Do you want to add '$author' to your blacklist?") },
+                    onDismissRequest = { userToBlock = null },
+                    title = { Text("Block User?") },
+                    text = { Text("Do you want to add '@$author' to your blocked list?") },
                     confirmButton = {
                         Button(onClick = {
-                            viewModel.addAccountToBlacklist(author)
-                            accountToBlacklist = null
+                            viewModel.addBlacklistUser(author)
+                            userToBlock = null
                         }) { Text("Block") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { accountToBlacklist = null }) { Text("Cancel") }
+                        TextButton(onClick = { userToBlock = null }) { Text("Cancel") }
                     }
-                )
-            }
-
-            if (showBlacklistDialog) {
-                ManageBlacklistDialog(
-                    viewModel = viewModel,
-                    onDismiss = { showBlacklistDialog = false }
                 )
             }
 
@@ -384,50 +199,6 @@ fun ImgurFeedScreen(
             }
         }
     }
-}
-
-@Composable
-fun ManageBlacklistDialog(viewModel: ImgurViewModel, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Blocked Accounts") },
-        text = {
-            if (viewModel.blacklistedAccounts.isEmpty()) {
-                Text("Your blacklist is currently empty.")
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 300.dp)
-                ) {
-                    items(viewModel.blacklistedAccounts) { account ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "@$account",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            IconButton(
-                                onClick = { viewModel.removeAccountFromBlacklist(account) }
-                            ) {
-                                Text(text = "❌", style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                        HorizontalDivider()
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
-        }
-    )
 }
 
 @Composable
@@ -697,7 +468,7 @@ fun CommentItem(comment: ImgurComment, depth: Int = 0) {
 @Composable
 fun PostDetailBottomSheet(
     initialIndex: Int,
-    viewModel: ImgurViewModel,
+    viewModel: MainViewModel,
     onDismiss: () -> Unit,
     onDoubleClick: (Int) -> Unit
 ) {
