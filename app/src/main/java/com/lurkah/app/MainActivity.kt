@@ -629,6 +629,7 @@ fun PostDetailBottomSheet(
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
             val isCurrentPage = pagerState.currentPage == page
 
+            // Hole Album-Bilder aus dem Cache oder Fallback auf Post-Bilder
             val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
 
             LazyColumn(
@@ -684,11 +685,13 @@ fun PostDetailBottomSheet(
                         )
                     }
 
+                    // Einheitlicher, fester Container für das Medium, damit nichts wegläuft
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .wrapContentHeight()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp))
+                            .height(350.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
                         val displayItems = remember(currentImages, post.mediaUrl, post.id) {
                             val rawList = if (!currentImages.isNullOrEmpty()) {
@@ -715,41 +718,55 @@ fun PostDetailBottomSheet(
                         }
 
                         if (displayItems.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(250.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                            }
+                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
                         } else {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                displayItems.forEachIndexed { imgIndex, img ->
-                                    val shouldPlayVideo = isCurrentPage && imgIndex == 0
+                            // Wenn das Album mehrere Bilder hat, nutzen wir einen internen Pager,
+                            // anstatt alle untereinander zu quetschen. Das verhindert Layout-Kollapse.
+                            val albumPagerState = rememberPagerState(pageCount = { displayItems.size })
 
-                                    DetailMediaItem(
-                                        img = img,
-                                        imgIndex = imgIndex,
-                                        post = post,
-                                        isCurrentPage = shouldPlayVideo,
-                                        autoReplay = autoReplay,
-                                        autoPlayVideos = autoPlayVideos,
-                                        onDoubleClick = { currentPos ->
-                                            onDoubleClick(page, currentPos)
-                                        },
-                                        onPlayerReady = { player ->
-                                            if (player != null) {
-                                                if (!shouldPlayVideo) {
-                                                    player.playWhenReady = false
-                                                } else {
-                                                    activePlayer = player
-                                                }
+                            HorizontalPager(
+                                state = albumPagerState,
+                                modifier = Modifier.fillMaxSize()
+                            ) { albumPageIndex ->
+                                val img = displayItems[albumPageIndex]
+                                val shouldPlayVideo = isCurrentPage && albumPagerState.currentPage == albumPageIndex
+
+                                DetailMediaItem(
+                                    img = img,
+                                    imgIndex = albumPageIndex,
+                                    post = post,
+                                    isCurrentPage = shouldPlayVideo,
+                                    autoReplay = autoReplay,
+                                    autoPlayVideos = autoPlayVideos,
+                                    onDoubleClick = { currentPos ->
+                                        onDoubleClick(page, currentPos)
+                                    },
+                                    onPlayerReady = { player ->
+                                        if (player != null) {
+                                            if (!shouldPlayVideo) {
+                                                player.playWhenReady = false
+                                            } else {
+                                                activePlayer = player
                                             }
                                         }
+                                    }
+                                )
+                            }
+
+                            // Indikator für mehrere Bilder im Album (optional, falls gewünscht, aber hier dezent)
+                            if (displayItems.size > 1) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.Black.copy(alpha = 0.6f),
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${albumPagerState.currentPage + 1} / ${displayItems.size}",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
                             }
