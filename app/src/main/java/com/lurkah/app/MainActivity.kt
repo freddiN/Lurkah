@@ -129,6 +129,7 @@ fun ImgurFeedScreen(
     var selectedPostIndex by remember { mutableStateOf<Int?>(null) }
     var fullScreenPostIndex by remember { mutableStateOf<Int?>(null) }
     var userToBlock by remember { mutableStateOf<String?>(null) }
+    var lastVideoPosition by remember { mutableStateOf(0L) }
 
     val gridState = rememberLazyGridState()
     val pullToRefreshState = rememberPullToRefreshState()
@@ -241,7 +242,6 @@ fun ImgurFeedScreen(
 
             selectedPostIndex?.let { initialIndex ->
                 // Variable, um sich die aktuelle Videoposition im BottomSheet zu merken
-                var lastVideoPosition by remember { mutableStateOf(0L) }
 
                 PostDetailBottomSheet(
                     initialIndex = initialIndex,
