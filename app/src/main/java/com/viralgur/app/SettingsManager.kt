@@ -25,13 +25,13 @@ class SettingsManager(private val context: Context) {
         preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
     }
 
-    async fun setDarkMode(enabled: Boolean) {
+    suspend fun setDarkMode(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[DARK_MODE_KEY] = enabled
         }
     }
 
-    async fun addBlacklistedUser(user: String) {
+    suspend fun addBlacklistedUser(user: String) {
         val cleanUser = user.trim().removePrefix("@")
         if (cleanUser.isBlank()) return
         context.dataStore.edit { preferences ->
@@ -40,7 +40,7 @@ class SettingsManager(private val context: Context) {
         }
     }
 
-    async fun removeBlacklistedUser(user: String) {
+    suspend fun removeBlacklistedUser(user: String) {
         context.dataStore.edit { preferences ->
             val current = preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
             preferences[BLACKLISTED_USERS_KEY] = current - user
