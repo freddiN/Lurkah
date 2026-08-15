@@ -614,15 +614,18 @@ fun PostDetailBottomSheet(
         }
     }
 
+    // Verwende standardmäßig 'sheetState' oder eine feste, sichere Layout-Vorgabe,
+    // damit die Ansicht nicht dynamisch einknickt.
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxHeight(0.92f)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        modifier = Modifier.fillMaxHeight(0.9f)
     ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f) // Wichtig: Damit der Pager den verfügbaren Platz ausfüllt und nicht kollabiert
+                .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surface)
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
@@ -634,7 +637,7 @@ fun PostDetailBottomSheet(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(bottom = 48.dp)
+                contentPadding = PaddingValues(bottom = 64.dp)
             ) {
                 item {
                     Text(
@@ -683,14 +686,15 @@ fun PostDetailBottomSheet(
                         )
                     }
 
-                    // Fester Container für Medien, damit das Layout beim Laden stabil bleibt
+                    // Stabiler Container mit fester Vorab-Höhe für das Medium
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 200.dp, max = 450.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp))
+                            .height(350.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        val displayItems = remember(currentImages, post.mediaUrl) {
+                        val displayItems = remember(currentImages, post.mediaUrl, post.id) {
                             val rawList = if (!currentImages.isNullOrEmpty()) {
                                 currentImages
                             } else if (post.mediaUrl != null) {
@@ -704,7 +708,7 @@ fun PostDetailBottomSheet(
                                     )
                                 )
                             } else {
-                                emptyList<ImgurImage>()
+                                emptyList()
                             }
 
                             rawList.map { img ->
@@ -715,13 +719,12 @@ fun PostDetailBottomSheet(
                         }
 
                         if (displayItems.isEmpty()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                            }
+                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
                         } else {
                             Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 displayItems.forEachIndexed { imgIndex, img ->
                                     DetailMediaItem(
