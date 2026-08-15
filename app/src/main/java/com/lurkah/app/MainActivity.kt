@@ -646,8 +646,8 @@ fun PostDetailBottomSheet(
                     tagToBlock?.let { tag ->
                         AlertDialog(
                             onDismissRequest = { tagToBlock = null },
-                            title = { Text("Tag blockieren?") },
-                            text = { Text("Möchtest du den Tag '#$tag' blockieren? Beiträge mit diesem Tag werden nicht mehr gezeigt.") },
+                            title = { Text("Block Tag?") },
+                            text = { Text("Du you wan to block the tag '#$tag' ? Entries with this tag will be hidden.") },
                             confirmButton = {
                                 Button(onClick = {
                                     viewModel.addBlacklistTag(tag)
@@ -655,7 +655,7 @@ fun PostDetailBottomSheet(
                                 }) { Text("Blockieren") }
                             },
                             dismissButton = {
-                                TextButton(onClick = { tagToBlock = null }) { Text("Abbrechen") }
+                                TextButton(onClick = { tagToBlock = null }) { Text("Cancel") }
                             }
                         )
                     }
