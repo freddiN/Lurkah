@@ -1,5 +1,6 @@
 package com.viralgur.app
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -15,13 +16,13 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsScreen(
     isDarkMode: Boolean,
-    blacklist: Set<String>,
+    blacklistedUsers: Set<String>,
     onDarkModeToggle: (Boolean) -> Unit,
-    onAddBlacklistTag: (String) -> Unit,
-    onRemoveBlacklistTag: (String) -> Unit,
+    onAddBlacklistUser: (String) -> Unit,
+    onRemoveBlacklistUser: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var newTagText by remember { mutableStateOf("") }
+    var newUserText by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -30,7 +31,7 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Text(
-            text = "Einstellungen",
+            text = "Settings",
             style = MaterialTheme.typography.headlineMedium
         )
 
@@ -41,7 +42,7 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Dunkles Design (Dark Mode)",
+                text = "Dark Mode",
                 style = MaterialTheme.typography.bodyLarge
             )
             Switch(
@@ -52,10 +53,10 @@ fun SettingsScreen(
 
         HorizontalDivider()
 
-        // --- Blacklist Verwaltung ---
+        // --- Blacklist Management (Users) ---
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = "Blacklist (Blockierte Tags)",
+                text = "Blocked Users",
                 style = MaterialTheme.typography.titleMedium
             )
 
@@ -65,28 +66,29 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
-                    value = newTagText,
-                    onValueChange = { newTagText = it },
-                    label = { Text("Tag hinzufügen") },
+                    value = newUserText,
+                    onValueChange = { newUserText = it },
+                    label = { Text("Enter username") },
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(
                     onClick = {
-                        if (newTagText.isNotBlank()) {
-                            onAddBlacklistTag(newTagText)
-                            newTagText = ""
+                        if (newUserText.isNotBlank()) {
+                            val cleanUser = newUserText.trim().removePrefix("@")
+                            onAddBlacklistUser(cleanUser)
+                            newUserText = ""
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Hinzufügen")
+                    Icon(Icons.Default.Add, contentDescription = "Block user")
                 }
             }
 
-            // Liste der geblockten Tags als Chips
-            if (blacklist.isEmpty()) {
+            // Blocked users chip list
+            if (blacklistedUsers.isEmpty()) {
                 Text(
-                    text = "Keine Tags blockiert.",
+                    text = "No users blocked.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -95,21 +97,19 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(blacklist.toList()) { tag ->
+                    items(blacklistedUsers.toList()) { user ->
                         InputChip(
                             selected = false,
                             onClick = { },
-                            label = { Text(tag) },
+                            label = { Text("@$user") },
                             trailingIcon = {
-                                IconButton(
-                                    onClick = { onRemoveBlacklistTag(tag) },
-                                    modifier = Modifier.size(18.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Entfernen"
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove",
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable { onRemoveBlacklistUser(user) }
+                                )
                             }
                         )
                     }
