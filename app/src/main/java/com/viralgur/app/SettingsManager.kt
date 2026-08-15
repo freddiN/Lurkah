@@ -17,6 +17,7 @@ class SettingsManager(private val context: Context) {
         private val BLACKLISTED_USERS_KEY = stringSetPreferencesKey("blacklisted_users")
         private val BLACKLISTED_TAGS_KEY = stringSetPreferencesKey("blacklisted_tags")
         private val AUTO_PLAY_VIDEOS_KEY = booleanPreferencesKey("auto_play_videos")
+        private val AUTO_REPLAY_KEY = booleanPreferencesKey("auto_replay")
     }
 
     val isDarkMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -35,9 +36,19 @@ class SettingsManager(private val context: Context) {
         preferences[AUTO_PLAY_VIDEOS_KEY] ?: true
     }
 
+    val autoReplay: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_REPLAY_KEY] ?: true
+    }
+
     suspend fun setAutoPlayVideos(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[AUTO_PLAY_VIDEOS_KEY] = enabled
+        }
+    }
+
+    suspend fun setAutoReplay(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_REPLAY_KEY] = enabled
         }
     }
 
