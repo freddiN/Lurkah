@@ -300,7 +300,7 @@ fun SmartMediaCard(
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(post.thumbnailUrl)
-                        .crossfade(true)
+                        //.crossfade(true)
                         .diskCachePolicy(CachePolicy.ENABLED)
                         .memoryCachePolicy(CachePolicy.ENABLED)
                         .build(),
@@ -419,13 +419,29 @@ fun FullScreenMediaViewer(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        val imgurImages = post.images
+                        val displayItems = remember(post.images, post.mediaUrl) {
+                            if (!post.images.isNullOrEmpty()) {
+                                post.images!!
+                            } else if (post.mediaUrl != null) {
+                                listOf(
+                                    ImgurImage(
+                                        id = post.id,
+                                        link = post.mediaUrl!!,
+                                        mp4 = if (post.isVideo) post.mediaUrl else null,
+                                        type = if (post.isVideo) "video/mp4" else "image/jpeg",
+                                        size = post.sizeInBytes
+                                    )
+                                )
+                            } else {
+                                emptyList()
+                            }
+                        }
 
-                        if (!imgurImages.isNullOrEmpty()) {
-                            // Im Vollbild für Alben das erste oder aktive Bild/Video anzeigen
-                            val firstImg = imgurImages.firstOrNull()
-                            val itemUrl = firstImg?.mp4 ?: firstImg?.link ?: post.mediaUrl
-                            val isItemVideo = (firstImg?.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+                        if (displayItems.isNotEmpty()) {
+                            // Im Vollbild für Alben das erste Bild/Video anzeigen
+                            val firstImg = displayItems.first()
+                            val itemUrl = firstImg.mp4 ?: firstImg.link
+                            val isItemVideo = (firstImg.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
 
                             if (isItemVideo && itemUrl != null) {
                                 VideoPlayer(
@@ -440,7 +456,6 @@ fun FullScreenMediaViewer(
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
                                         .data(itemUrl)
-                                        .crossfade(true)
                                         .diskCachePolicy(CachePolicy.ENABLED)
                                         .memoryCachePolicy(CachePolicy.ENABLED)
                                         .build(),
@@ -463,41 +478,6 @@ fun FullScreenMediaViewer(
                                         }
                                 )
                             }
-                        } else if (post.isVideo && post.mediaUrl != null) {
-                            VideoPlayer(
-                                videoUrl = post.mediaUrl!!,
-                                isMuted = false,
-                                autoReplay = autoReplay,
-                                autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                showControls = true,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else if (post.mediaUrl != null) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(post.mediaUrl)
-                                    .crossfade(true)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .build(),
-                                contentDescription = post.title,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onDoubleTap = {
-                                                if (scale > 1f) {
-                                                    scale = 1f
-                                                    offsetX = 0f
-                                                    offsetY = 0f
-                                                } else {
-                                                    scale = 2.5f
-                                                }
-                                            }
-                                        )
-                                    }
-                            )
                         }
                     }
                 }
@@ -678,83 +658,65 @@ fun PostDetailBottomSheet(
                             .fillMaxWidth()
                             .wrapContentHeight()
                     ) {
-                        val imgurImages = post.images
+                        // Einheitliche Liste erzeugen, um UI-Sprünge ("Verschwinden") zu verhindern
+                        val displayItems = remember(post.images, post.mediaUrl) {
+                            if (!post.images.isNullOrEmpty()) {
+                                post.images!!
+                            } else if (post.mediaUrl != null) {
+                                listOf(
+                                    ImgurImage(
+                                        id = post.id,
+                                        link = post.mediaUrl!!,
+                                        mp4 = if (post.isVideo) post.mediaUrl else null,
+                                        type = if (post.isVideo) "video/mp4" else "image/jpeg",
+                                        size = post.sizeInBytes
+                                    )
+                                )
+                            } else {
+                                emptyList()
+                            }
+                        }
 
-                        if (!imgurImages.isNullOrEmpty()) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                imgurImages.forEachIndexed { imgIndex, img ->
-                                    val itemUrl = img.mp4 ?: img.link
-                                    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            displayItems.forEachIndexed { imgIndex, img ->
+                                val itemUrl = img.mp4 ?: img.link
+                                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
 
-                                    if (isItemVideo && itemUrl != null) {
-                                        // Video spielt nur ab, wenn es in der aktuellen Page ist UND die Seite aktiv ist
-                                        VideoPlayer(
-                                            videoUrl = itemUrl,
-                                            isMuted = false,
-                                            autoReplay = autoReplay,
-                                            autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                            showControls = true,
-                                            onDoubleClick = { onDoubleClick(page) },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(max = 350.dp)
-                                        )
-                                    } else if (itemUrl != null) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current)
-                                                .data(itemUrl)
-                                                .crossfade(true)
-                                                .diskCachePolicy(CachePolicy.ENABLED)
-                                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                                .build(),
-                                            contentDescription = "${post.title} - ${imgIndex + 1}",
-                                            contentScale = ContentScale.Fit,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(max = 350.dp)
-                                                .pointerInput(Unit) {
-                                                    detectTapGestures(
-                                                        onDoubleTap = { onDoubleClick(page) }
-                                                    )
-                                                }
-                                        )
-                                    }
+                                if (isItemVideo && itemUrl != null) {
+                                    VideoPlayer(
+                                        videoUrl = itemUrl,
+                                        isMuted = false,
+                                        autoReplay = autoReplay,
+                                        autoPlayVideos = autoPlayVideos && isCurrentPage,
+                                        showControls = true,
+                                        onDoubleClick = { onDoubleClick(page) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 350.dp)
+                                    )
+                                } else if (itemUrl != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(itemUrl)
+                                            .diskCachePolicy(CachePolicy.ENABLED)
+                                            .memoryCachePolicy(CachePolicy.ENABLED)
+                                            .build(),
+                                        contentDescription = "${post.title} - ${imgIndex + 1}",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 350.dp)
+                                            .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onDoubleTap = { onDoubleClick(page) }
+                                                )
+                                            }
+                                    )
                                 }
                             }
-                        } else if (post.isVideo && post.mediaUrl != null) {
-                            VideoPlayer(
-                                videoUrl = post.mediaUrl!!,
-                                isMuted = false,
-                                autoReplay = autoReplay,
-                                autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                showControls = true,
-                                onDoubleClick = { onDoubleClick(page) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 350.dp)
-                            )
-                        } else if (post.mediaUrl != null) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(post.mediaUrl)
-                                    .crossfade(true)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .build(),
-                                contentDescription = post.title,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 350.dp)
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onDoubleTap = { onDoubleClick(page) }
-                                        )
-                                    }
-                            )
                         }
                     }
 
