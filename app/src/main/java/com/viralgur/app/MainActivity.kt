@@ -7,7 +7,6 @@ package com.viralgur.app
 
 import android.net.Uri
 import android.os.Bundle
-import android.view.TextureView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -59,7 +58,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val isDarkMode by mainViewModel.isDarkMode.collectAsState()
-            val autoReplay by mainViewModel.autoReplay.collectAsState()
+            val autoReplay by mainViewModel.autoPlayVideos.collectAsState() // Korrigiert auf tatsächlichen State im ViewModel
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
@@ -93,7 +92,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
-            onAutoReplayToggle = { viewModel.toggleAutoReplay(it) },
+            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) }, // Korrigiert auf ViewModel-Funktion
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             modifier = Modifier.systemBarsPadding()
@@ -671,9 +670,8 @@ fun VideoPlayer(
                     player = exoPlayer
                     useController = showControls
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    // Nutzen einer direkten TextureView via PlayerView-Zuweisung um das Aufblitzen zu verhindern
-                    val textureView = TextureView(ctx)
-                    setVideoTextureView(textureView)
+                    // Offizieller Workaround von Media3 für Compose gegen das Aufblitzen beim Schließen
+                    setEnableComposeSurfaceSyncWorkaround(true)
                 }
             },
             modifier = Modifier.fillMaxSize()
