@@ -185,7 +185,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentPage = 0
 
-    iinit {
+    init {
         viewModelScope.launch {
             blacklistedUsers.collect {
                 loadViralPosts(isRefresh = true)
@@ -196,7 +196,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 loadViralPosts(isRefresh = true)
             }
         }
-    }
     }
 
     fun loadViralPosts(isRefresh: Boolean = false) {
