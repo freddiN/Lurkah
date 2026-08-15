@@ -312,7 +312,7 @@ fun SmartMediaCard(
                 if (post.isVideo) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
                             .background(Color.Black.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -438,7 +438,12 @@ fun FullScreenMediaViewer(
                                 )
                             } else if (itemUrl != null) {
                                 AsyncImage(
-                                    model = itemUrl,
+                                    model = ImageRequest.Builder(LocalContext.current))
+                                        .data(itemUrl)
+                                        .crossfade(true)
+                                        .diskCachePolicy(CachePolicy.ENABLED)
+                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                                        .build(),
                                     contentDescription = post.title,
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier
@@ -469,7 +474,12 @@ fun FullScreenMediaViewer(
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
-                                model = post.mediaUrl,
+                                model = ImageRequest.Builder(LocalContext.current))
+                                    .data(post.mediaUrl)
+                                    .crossfade(true)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .build(),
                                 contentDescription = post.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
@@ -650,7 +660,7 @@ fun PostDetailBottomSheet(
                         AlertDialog(
                             onDismissRequest = { tagToBlock = null },
                             title = { Text("Tag blockieren?") },
-                            text = { Text("Möchtest du den Tag '#$tag' blockieren? Beiträge mit diesem Tag werden nicht mehr angezeigt.") },
+                            text = { Text("Möchtest du den Tag '#$tag' blockieren? Beiträge mit diesem Tag werden nicht mehr gezeigt.") },
                             confirmButton = {
                                 Button(onClick = {
                                     viewModel.addBlacklistTag(tag)
@@ -694,7 +704,12 @@ fun PostDetailBottomSheet(
                                         )
                                     } else if (itemUrl != null) {
                                         AsyncImage(
-                                            model = itemUrl,
+                                            model = ImageRequest.Builder(LocalContext.current))
+                                                .data(itemUrl)
+                                                .crossfade(true)
+                                                .diskCachePolicy(CachePolicy.ENABLED)
+                                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                                .build(),
                                             contentDescription = "${post.title} - ${imgIndex + 1}",
                                             contentScale = ContentScale.Fit,
                                             modifier = Modifier
@@ -723,7 +738,12 @@ fun PostDetailBottomSheet(
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
-                                model = post.mediaUrl,
+                                model = ImageRequest.Builder(LocalContext.current))
+                                    .data(post.mediaUrl)
+                                    .crossfade(true)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .build(),
                                 contentDescription = post.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
@@ -785,7 +805,6 @@ fun VideoPlayer(
     videoUrl: String,
     isMuted: Boolean,
     autoReplay: Boolean,
-    autoPlayVideos: Boolean,
     modifier: Modifier = Modifier,
     showControls: Boolean = true,
     onDoubleClick: (() -> Unit)? = null
