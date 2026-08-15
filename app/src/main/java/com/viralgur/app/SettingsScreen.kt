@@ -15,8 +15,10 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SettingsScreen(
     isDarkMode: Boolean,
+    autoReplay: Boolean,
     blacklistedUsers: Set<String>,
     onDarkModeToggle: (Boolean) -> Unit,
+    onAutoReplayToggle: (Boolean) -> Unit,
     onAddBlacklistUser: (String) -> Unit,
     onRemoveBlacklistUser: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -45,6 +47,25 @@ fun SettingsScreen(
                 Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // NEU: Auto Replay Toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Auto Replay Videos", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Videos automatisch von vorne abspielen",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = autoReplay, onCheckedChange = onAutoReplayToggle)
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // Überschrift für blockierte Nutzer
@@ -65,7 +86,6 @@ fun SettingsScreen(
                 )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    // Liste alphabetisch sortieren für bessere Übersicht
                     items(blacklistedUsers.toList().sorted()) { user ->
                         Row(
                             modifier = Modifier
@@ -79,7 +99,6 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             
-                            // Minus-Button zum Entfernen des Nutzers von der Blacklist
                             IconButton(onClick = { onRemoveBlacklistUser(user) }) {
                                 Text(
                                     text = "−", 
