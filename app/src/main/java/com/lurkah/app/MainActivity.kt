@@ -134,6 +134,17 @@ fun ImgurFeedScreen(
     val gridState = rememberLazyGridState()
     val pullToRefreshState = rememberPullToRefreshState()
 
+    viewModel.errorMessage?.let { errorMsg ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            title = { Text("Notice") },
+            text = { Text(errorMsg) },
+            confirmButton = {
+                Button(onClick = { viewModel.clearError() }) { Text("OK") }
+            }
+        )
+    }
+
     if (pullToRefreshState.isRefreshing) {
         LaunchedEffect(true) {
             viewModel.loadViralPosts(isRefresh = true)
@@ -262,6 +273,7 @@ fun ImgurFeedScreen(
                     posts = viewModel.posts,
                     autoReplay = autoReplay,
                     initialPlaybackPosition = lastVideoPosition, // Falls gewünscht übergeben
+                    viewModel = viewModel,
                     onDismiss = { index ->
                         fullScreenPostIndex = null
                         selectedPostIndex = index
@@ -368,13 +380,13 @@ fun FullScreenMediaViewer(
     initialIndex: Int,
     posts: List<ImgurPost>,
     autoReplay: Boolean,
-    initialPlaybackPosition: Long = 0L, // <--- Neu: Startposition übergeben
+    initialPlaybackPosition: Long = 0L,
+    viewModel: MainViewModel,
     onDismiss: (Int) -> Unit
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
 
-    val viewModel: MainViewModel = viewModel()
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
     Dialog(

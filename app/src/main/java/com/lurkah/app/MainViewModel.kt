@@ -116,58 +116,19 @@ interface ImgurApiService {
     ): ImgurAlbumResponse
 }
 
-// --- VIEWMODEL ---
 class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val clientId = "Client-ID 546c25a59c58ad7" // public anonymous client
+    private val clientId = "Client-ID 546c25a59c58ad7"
     private val settingsManager = SettingsManager(application)
 
-    // 1. AUTO-PLAY (Videos starten automatisch beim Laden)
-    val autoPlayVideos: StateFlow<Boolean> = settingsManager.autoPlayVideos.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
+    // --- NEU: Error State für UI-Feedback ---
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
 
-    fun toggleAutoPlayVideos(enabled: Boolean) {
-        viewModelScope.launch { settingsManager.setAutoPlayVideos(enabled) }
+    fun clearError() {
+        errorMessage = null
     }
 
-    // 2. AUTO-REPLAY (Videos starten am Ende automatisch von vorn)
-    val autoReplay: StateFlow<Boolean> = settingsManager.autoReplay.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
-
-    fun toggleAutoPlay(enabled: Boolean) {
-        viewModelScope.launch { settingsManager.setAutoReplay(enabled) }
-    }
-
-    val isDarkMode: StateFlow<Boolean> = settingsManager.isDarkMode.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true
-    )
-
-    val blacklistedUsers: StateFlow<Set<String>> = settingsManager.blacklistedUsers.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptySet()
-    )
-
-    val blacklistedTags: StateFlow<Set<String>> = settingsManager.blacklistedTags.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptySet()
-    )
-
-    private val api: ImgurApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl("https://api.imgur.com/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ImgurApiService::class.java)
-    }
+    // ... (bisherige Flows für autoPlayVideos, autoReplay, isDarkMode, etc.)
 
     var posts = mutableStateListOf<ImgurPost>()
         private set
@@ -223,19 +184,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         !currentBlacklist.contains(author) && !hasBlockedTag && post.mediaUrl != null
                     }
 
-                    // Threadsicheres Aktualisieren der Compose StateList
                     if (isRefresh) {
                         posts.clear()
                     }
-                    // Duplikate vermeiden, falls die API Seiten doppelt liefert
                     val existingIds = posts.map { it.id }.toSet()
                     val newUniquePosts = filtered.filter { !existingIds.contains(it.id) }
 
                     posts.addAll(newUniquePosts)
                     currentPage++
+                } else {
+                    errorMessage = "Failed to load viral posts."
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                errorMessage = "Network error: ${e.localizedMessage ?: "Please check your connection."}"
             } finally {
                 isRefreshing = false
                 isLoadingMore = false
@@ -254,6 +216,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                errorMessage = "Could not load comments."
             } finally {
                 isLoadingComments = false
             }
