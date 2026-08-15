@@ -211,15 +211,6 @@ fun ImgurFeedScreen(
                 }
             }
 
-            // HIER WIRD DER VERTIKALE SCROLLBALKEN PLATZIERT
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(gridState),
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .padding(end = 2.dp)
-            )
-
             PullToRefreshContainer(
                 state = pullToRefreshState,
                 modifier = Modifier.align(Alignment.TopCenter)
