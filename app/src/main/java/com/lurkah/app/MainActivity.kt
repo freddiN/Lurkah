@@ -592,7 +592,11 @@ fun PostDetailBottomSheet(
 
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
-        currentPost?.let { viewModel.loadCommentsForPost(it.id) }
+        currentPost?.let { post ->
+            viewModel.loadCommentsForPost(post.id)
+            // Lade die restlichen Album-Bilder nach, falls das Album größer ist
+            viewModel.loadFullAlbumDetails(post.id, pagerState.currentPage)
+        }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.9f)) {

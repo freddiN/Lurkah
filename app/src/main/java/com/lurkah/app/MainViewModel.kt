@@ -23,6 +23,9 @@ import java.util.Locale
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
 data class ImgurCommentsResponse(val data: List<ImgurComment>, val success: Boolean)
 
+data class ImgurAlbumResponse(val data: ImgurAlbumData, val success: Boolean)
+data class ImgurAlbumData(val images: List<ImgurImage>?)
+
 data class ImgurPost(
     val id: String,
     val title: String,
@@ -104,6 +107,12 @@ interface ImgurApiService {
         @Header("Authorization") authHeader: String,
         @Path("galleryHash") galleryHash: String
     ): ImgurCommentsResponse
+
+    @GET("3/album/{id}")
+    suspend fun getAlbumDetails(
+        @Header("Authorization") authHeader: String,
+        @Path("id") albumId: String
+    ): ImgurAlbumResponse
 }
 
 // --- VIEWMODEL ---
@@ -178,12 +187,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            blacklistedUsers.collect {
-                loadViralPosts(isRefresh = true)
-            }
-        }
-        viewModelScope.launch {
-            blacklistedTags.collect {
+            combine(blacklistedUsers, blacklistedTags) { users, tags ->
+                Pair(users, tags)
+            }.collect { _ ->
+                // Hier könnte man noch ein .debounce(300) einbauen,
+                // falls die SettingsManager-Updates sehr schnell hintereinander feuern
                 loadViralPosts(isRefresh = true)
             }
         }
@@ -268,5 +276,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeBlacklistTag(tag: String) {
         viewModelScope.launch { settingsManager.removeBlacklistedTag(tag) }
+    }
+
+    fun loadFullAlbumDetails(postId: String, indexInList: Int) {
+        val post = posts.getOrNull(indexInList) ?: return
+        // Wenn schon Bilder da sind oder es kein Album ist, abbrechen
+        if (post.images.isNullOrEmpty() || post.images.size > 3) return
+
+        viewModelScope.launch {
+            try {
+                val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
+                if (response.success && !response.data.images.isNullOrEmpty()) {
+                    // Ersetze das Post-Objekt in der Liste mit der vollen Bilderrate
+                    val updatedPost = post.copy(images = response.data.images)
+                    posts[indexInList] = updatedPost
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
