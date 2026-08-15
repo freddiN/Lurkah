@@ -19,9 +19,6 @@ import retrofit2.http.Header
 import retrofit2.http.Path
 import java.util.Locale
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-
 // --- DATA MODELS ---
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
 data class ImgurCommentsResponse(val data: List<ImgurComment>, val success: Boolean)
@@ -31,9 +28,8 @@ data class ImgurPost(
     val title: String,
     @SerializedName("account_url") val accountUrl: String?,
     val images: List<ImgurImage>?,
-    @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList() // Liest die Tags aus der API
+    @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList()
 ) {
-    // Wandelt die API-Tags in eine einfache Liste von Strings für die UI um
     val tags: List<String>
         get() = rawTags?.map { it.name } ?: emptyList()
 
@@ -74,7 +70,6 @@ data class ImgurPost(
         }
 }
 
-// Das Modell für die Tags der Imgur API
 data class ImgurTag(
     val name: String
 )
@@ -116,23 +111,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val clientId = "Client-ID 546c25a59c58ad7" // public anonymous client
     private val settingsManager = SettingsManager(application)
 
-    private val _autoPlayVideos = MutableStateFlow(false)
-    val autoPlayVideos: StateFlow<Boolean> = _autoPlayVideos.asStateFlow()
-
-    fun toggleAutoPlay(enabled: Boolean) {
-        _autoPlayVideos.value = enabled
-    }
-
+    // 1. AUTO-PLAY (Videos starten automatisch beim Laden)
     val autoPlayVideos: StateFlow<Boolean> = settingsManager.autoPlayVideos.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = true // Standardmässig an
+        initialValue = true
     )
 
     fun toggleAutoPlayVideos(enabled: Boolean) {
         viewModelScope.launch { settingsManager.setAutoPlayVideos(enabled) }
     }
 
+    // 2. AUTO-REPLAY (Videos starten am Ende automatisch von vorn)
+    val autoReplay: StateFlow<Boolean> = settingsManager.autoReplay.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = true
+    )
+
+    fun toggleAutoPlay(enabled: Boolean) {
+        viewModelScope.launch { settingsManager.setAutoReplay(enabled) }
+    }
 
     val isDarkMode: StateFlow<Boolean> = settingsManager.isDarkMode.stateIn(
         scope = viewModelScope,
@@ -141,6 +140,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     val blacklistedUsers: StateFlow<Set<String>> = settingsManager.blacklistedUsers.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptySet()
+    )
+
+    val blacklistedTags: StateFlow<Set<String>> = settingsManager.blacklistedTags.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptySet()
@@ -176,8 +181,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             blacklistedUsers.collect {
                 loadViralPosts(isRefresh = true)
             }
-            viewModelScope.launch {
-                blacklistedTags.collect { loadViralPosts(isRefresh = true) }
+        }
+        viewModelScope.launch {
+            blacklistedTags.collect {
+                loadViralPosts(isRefresh = true)
             }
         }
     }
@@ -248,12 +255,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removeBlacklistUser(username: String) {
         viewModelScope.launch { settingsManager.removeBlacklistedUser(username) }
     }
-
-    val blacklistedTags: StateFlow<Set<String>> = settingsManager.blacklistedTags.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptySet()
-    )
 
     fun addBlacklistTag(tag: String) {
         viewModelScope.launch { settingsManager.addBlacklistedTag(tag) }
