@@ -10,8 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,135 +34,135 @@ fun SettingsScreen(
         },
         modifier = modifier
     ) { padding ->
-        Column(
+        // Alles in einer einzigen LazyColumn, damit die gesamte Seite scrollbar ist
+        // und es keine Abstürze gibt, wenn beide Listen lang werden.
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // Dark Mode Toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Dark Mode", style = MaterialTheme.typography.titleMedium)
-                Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
-            }
+            // --- EINSTELLUNGEN ---
+            item {
+                // Dark Mode Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Dark Mode", style = MaterialTheme.typography.titleMedium)
+                    Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
+                }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // NEU: Auto Replay Toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Auto Replay Videos", style = MaterialTheme.typography.titleMedium)
+                // Auto Replay Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Auto Replay Videos", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "videos automatically start from the beginning",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = autoReplay, onCheckedChange = onAutoReplayToggle)
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // --- BLOCKIERTE ACCOUNTS ---
+                Text(
+                    text = "blocked accounts",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                if (blacklistedUsers.isEmpty()) {
                     Text(
-                        "videos automatically start from the beginning",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = "no accounts blocked.",
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(checked = autoReplay, onCheckedChange = onAutoReplayToggle)
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Überschrift für blockierte Nutzer
-            Text(
-                text = "Blockierte Accounts",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            // Liste der blockierten Nutzer
-            if (blacklistedUsers.isEmpty()) {
-                Text(
-                    text = "Keine Accounts blockiert.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(blacklistedUsers.toList().sorted()) { user ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "@$user",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            
-                            IconButton(onClick = { onRemoveBlacklistUser(user) }) {
-                                Text(
-                                    text = "−", 
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Blockierte Tags",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            if (blacklistedTags.isEmpty()) {
-                Text(
-                    text = "Keine Tags blockiert.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Column(
+            // Die Liste der Accounts
+            items(blacklistedUsers.toList().sorted()) { user ->
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(8.dp)
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    blacklistedTags.forEach { tag ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "#$tag",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            TextButton(
-                                onClick = { onRemoveBlacklistTag(tag) }
-                            ) {
-                                Text("Entsperren")
-                            }
-                        }
+                    Text(
+                        text = "@$user",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+
+                    IconButton(onClick = { onRemoveBlacklistUser(user) }) {
+                        Text(
+                            text = "−",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
 
+            // --- BLOCKIERTE TAGS ---
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "blocked tags",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                if (blacklistedTags.isEmpty()) {
+                    Text(
+                        text = "no tags blocked.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Die Liste der Tags
+            items(blacklistedTags.toList().sorted()) { tag ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "#$tag",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+
+                    IconButton(onClick = { onRemoveBlacklistTag(tag) }) {
+                        Text(
+                            text = "−",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -158,7 +158,7 @@ fun ImgurFeedScreen(
                     IconButton(
                         onClick = { viewModel.loadViralPosts(isRefresh = true) }
                     ) {
-                        Text("🔄", fontSize = 18.sp)
+                        Text("↻", fontSize = 18.sp)
                     }
                     IconButton(onClick = onOpenSettings) {
                         Text("⚙️", fontSize = 18.sp)
@@ -689,9 +689,6 @@ fun VideoPlayer(
     val context = LocalContext.current
     val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
 
-    // Referenz auf den PlayerView, um die Controls manuell ein-/auszublenden
-    var playerView by remember { mutableStateOf<PlayerView?>(null) }
-
     val exoPlayer = remember(videoUrl, autoReplay) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
@@ -712,8 +709,7 @@ fun VideoPlayer(
     }
 
     Box(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surface)
+        modifier = modifier.background(MaterialTheme.colorScheme.surface)
     ) {
         AndroidView(
             factory = { ctx ->
@@ -724,44 +720,31 @@ fun VideoPlayer(
                     hideController()           // Versteckt sie initial
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
 
-                    playerView = this // Referenz für unser Klick-Overlay speichern
+                    // Wir nutzen den nativen Android GestureDetector, um den Doppelklick passiv abzufangen
+                    val gestureDetector = android.view.GestureDetector(
+                        ctx,
+                        object : android.view.GestureDetector.SimpleOnGestureListener() {
+                            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                                currentOnDoubleClick?.invoke()
+                                return true
+                            }
+                        }
+                    )
+
+                    // TouchListener auf dem PlayerView
+                    setOnTouchListener { _, event ->
+                        gestureDetector.onTouchEvent(event)
+
+                        // WICHTIG: Wir geben 'false' zurück!
+                        // Dadurch lassen wir die Klicks durch zu den Controls (Play/Pause, Slider)
+                        // und der ExoPlayer kümmert sich selbständig um das Ein-/Ausblenden beim einfachen Klick.
+                        false
+                    }
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Ein durchgehendes Touch-Overlay, das unsere Klicks sauber verwaltet
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = {
-                            if (currentOnDoubleClick != null) {
-                                // Ruft den Vollbildmodus auf (BottomSheet)
-                                currentOnDoubleClick?.invoke()
-                            } else {
-                                // FALLS DU WIRKLICH willst, dass im Vollbild ein
-                                // Doppelklick die Controls steuert (statt normaler Klick):
-                                /*
-                                playerView?.let { pv ->
-                                    if (pv.isControllerFullyVisible) pv.hideController() else pv.showController()
-                                }
-                                */
-                            }
-                        },
-                        onTap = {
-                            // EINFACHER KLICK: Controls ein/ausblenden
-                            playerView?.let { pv ->
-                                if (pv.isControllerFullyVisible) {
-                                    pv.hideController()
-                                } else {
-                                    pv.showController()
-                                }
-                            }
-                        }
-                    )
-                }
-        )
+        // Das unsichtbare Compose-Overlay von vorher haben wir komplett gelöscht!
     }
 }
