@@ -1,39 +1,3 @@
-@file:OptIn(
-    androidx.compose.foundation.ExperimentalFoundationApi::class,
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
-    androidx.media3.common.util.UnstableApi::class
-)
-
-package com.lurkah.app
-
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.pager.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.*
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
-import coil.request.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-
 @Composable
 fun PostDetailBottomSheet(
     initialIndex: Int,
@@ -46,7 +10,6 @@ fun PostDetailBottomSheet(
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { viewModel.posts.size })
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
-    // FIX: Lädt NUR die Kommentare. Kein automatisches Neuladen von Alben, das den Hauptfeed triggert.
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
@@ -60,7 +23,6 @@ fun PostDetailBottomSheet(
     ) {
         HorizontalPager(
             state = pagerState,
-            beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
@@ -144,22 +106,19 @@ fun PostDetailBottomSheet(
                                         onDoubleClick = { onDoubleClick(page) },
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .heightIn(min = 250.dp, max = 350.dp)
+                                            .height(300.dp) // Feste Höhe erzwingt Stabilität
                                     )
                                 } else if (itemUrl != null) {
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(itemUrl)
-                                            .crossfade(false) // FIX: Verhindert Flackern/Verschwinden bei Recomposition
-                                            .memoryCachePolicy(CachePolicy.ENABLED)
-                                            .diskCachePolicy(CachePolicy.ENABLED)
+                                            .crossfade(false)
                                             .build(),
                                         contentDescription = "${post.title} - ${imgIndex + 1}",
                                         contentScale = ContentScale.Fit,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .heightIn(min = 250.dp, max = 350.dp)
-                                            .background(Color.DarkGray.copy(alpha = 0.1f)) // Platzhalter-Hintergrund
+                                            .height(300.dp) // Feste Höhe verhindert das Zusammenfallen
                                             .pointerInput(Unit) {
                                                 detectTapGestures(
                                                     onDoubleTap = { onDoubleClick(page) }
@@ -178,22 +137,19 @@ fun PostDetailBottomSheet(
                                 onDoubleClick = { onDoubleClick(page) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 350.dp)
+                                    .height(300.dp)
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(post.mediaUrl)
                                     .crossfade(false)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
                                     .build(),
                                 contentDescription = post.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(min = 250.dp, max = 350.dp)
-                                    .background(Color.DarkGray.copy(alpha = 0.1f))
+                                    .height(300.dp)
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { onDoubleClick(page) }
@@ -251,284 +207,4 @@ fun PostDetailBottomSheet(
             }
         }
     }
-}
-
-@Composable
-fun FullScreenMediaViewer(
-    initialIndex: Int,
-    posts: List<ImgurPost>,
-    autoReplay: Boolean,
-    onDismiss: (Int) -> Unit
-) {
-    val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
-    val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
-
-    val viewModel: MainViewModel = viewModel()
-    val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
-
-    Dialog(
-        onDismissRequest = { onDismiss(pagerState.currentPage) },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                val post = posts.getOrNull(page) ?: return@HorizontalPager
-                val isCurrentPage = pagerState.currentPage == page
-                var scale by remember { mutableFloatStateOf(1f) }
-                var offsetX by remember { mutableFloatStateOf(0f) }
-                var offsetY by remember { mutableFloatStateOf(0f) }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                scale = (scale * zoom).coerceIn(1f, 5f)
-                                if (scale > 1f) {
-                                    offsetX += pan.x
-                                    offsetY += pan.y
-                                } else {
-                                    offsetX = 0f
-                                    offsetY = 0f
-                                }
-                            }
-                        }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offsetX,
-                                translationY = offsetY
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val imgurImages = post.images
-
-                        if (!imgurImages.isNullOrEmpty()) {
-                            val firstImg = imgurImages.firstOrNull()
-                            val itemUrl = firstImg?.mp4 ?: firstImg?.link ?: post.mediaUrl
-                            val isItemVideo = (firstImg?.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
-
-                            if (isItemVideo && itemUrl != null) {
-                                VideoPlayer(
-                                    videoUrl = itemUrl,
-                                    isMuted = false,
-                                    autoReplay = autoReplay,
-                                    autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                    showControls = true,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else if (itemUrl != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(itemUrl)
-                                        .crossfade(false)
-                                        .memoryCachePolicy(CachePolicy.ENABLED)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .build(),
-                                    contentDescription = post.title,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .pointerInput(Unit) {
-                                            detectTapGestures(
-                                                onDoubleTap = {
-                                                    if (scale > 1f) {
-                                                        scale = 1f
-                                                        offsetX = 0f
-                                                        offsetY = 0f
-                                                    } else {
-                                                        scale = 2.5f
-                                                    }
-                                                }
-                                            )
-                                        }
-                                )
-                            }
-                        } else if (post.isVideo && post.mediaUrl != null) {
-                            VideoPlayer(
-                                videoUrl = post.mediaUrl!!,
-                                isMuted = false,
-                                autoReplay = autoReplay,
-                                autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                showControls = true,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else if (post.mediaUrl != null) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(post.mediaUrl)
-                                    .crossfade(false)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .build(),
-                                contentDescription = post.title,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onDoubleTap = {
-                                                if (scale > 1f) {
-                                                    scale = 1f
-                                                    offsetX = 0f
-                                                    offsetY = 0f
-                                                } else {
-                                                    scale = 2.5f
-                                                }
-                                            }
-                                        )
-                                    }
-                            )
-                        }
-                    }
-                }
-            }
-
-            IconButton(
-                onClick = { onDismiss(pagerState.currentPage) },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(24.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
-            ) {
-                Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-fun CommentItem(
-    comment: ImgurComment,
-    depth: Int = 0,
-    onImageReferenceClick: (Int) -> Unit
-) {
-    val maxDepth = 4
-    val currentIndent = depth.coerceAtMost(maxDepth)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        if (currentIndent > 0) {
-            repeat(currentIndent) {
-                Box(
-                    modifier = Modifier
-                        .width(12.dp)
-                        .fillMaxHeight()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                            .align(Alignment.CenterStart)
-                    )
-                }
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .background(
-                    if (depth > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "@${comment.author}",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                val score = comment.ups - comment.downs
-                Text(
-                    text = "▲ $score",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            CommentTextWithImageLinks(commentText = comment.comment, onImageReferenceClick = onImageReferenceClick)
-
-            comment.children?.forEach { childComment ->
-                Spacer(modifier = Modifier.height(4.dp))
-                CommentItem(comment = childComment, depth = depth + 1, onImageReferenceClick = onImageReferenceClick)
-            }
-        }
-    }
-}
-
-@Composable
-fun CommentTextWithImageLinks(
-    commentText: String,
-    onImageReferenceClick: (Int) -> Unit
-) {
-    val regex = Regex("#(\\d+)")
-    val matches = regex.findAll(commentText).toList()
-
-    if (matches.isEmpty()) {
-        Text(text = commentText, style = MaterialTheme.typography.bodyMedium)
-        return
-    }
-
-    val annotatedString = androidx.compose.ui.text.buildAnnotatedString {
-        var lastIndex = 0
-        matches.forEach { match ->
-            val range = match.range
-            append(commentText.substring(lastIndex, range.first))
-
-            val imageNumberStr = match.groupValues[1]
-            pushStringAnnotation(tag = "IMAGE_REF", annotation = imageNumberStr)
-            withStyle(
-                style = androidx.compose.ui.text.SpanStyle(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-            ) {
-                append(match.value)
-            }
-            pop()
-            lastIndex = range.last + 1
-        }
-        if (lastIndex < commentText.length) {
-            append(commentText.substring(lastIndex))
-        }
-    }
-
-    androidx.compose.foundation.text.ClickableText(
-        text = annotatedString,
-        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-        onClick = { offset ->
-            annotatedString.getStringAnnotations(tag = "IMAGE_REF", start = offset, end = offset)
-                .firstOrNull()?.let { annotation ->
-                    val pageNumber = annotation.item.toIntOrNull()
-                    if (pageNumber != null && pageNumber > 0) {
-                        onImageReferenceClick(pageNumber - 1)
-                    }
-                }
-        }
-    )
 }
