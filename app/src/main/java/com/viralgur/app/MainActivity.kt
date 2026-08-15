@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
 fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: Boolean) {
     var currentScreen by remember { mutableStateOf("feed") }
     val blacklistedUsers by viewModel.blacklistedUsers.collectAsState()
+    val blacklistedTags by viewModel.blacklistedTags.collectAsState()
 
     BackHandler(enabled = currentScreen == "settings") {
         currentScreen = "feed"
@@ -92,6 +93,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             isDarkMode = isDarkMode,
             autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
+            blacklistedTags = blacklistedTags,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
             onAutoReplayToggle = { viewModel.toggleAutoPlay(it) }, // <-- Hier fehlte vermutlich das Komma!
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
@@ -553,22 +555,40 @@ fun PostDetailBottomSheet(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-// --- HIER STARTET DIE NEUE LAZYROW FÜR DIE TAGS ---
+// --- TAGS MIT BESTÄTIGUNGS-DIALOG ---
+                    var tagToBlock by remember { mutableStateOf<String?>(null) }
+
                     if (post.tags.isNotEmpty()) {
                         androidx.compose.foundation.lazy.LazyRow(
                             modifier = Modifier.padding(bottom = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            // Nimm maximal 5 Tags, damit es nicht zu unübersichtlich wird
                             items(post.tags.take(5)) { tag ->
                                 SuggestionChip(
-                                    onClick = { viewModel.addBlacklistUser(tag) },
+                                    onClick = { tagToBlock = tag }, // Öffnet den Dialog
                                     label = { Text("#$tag") }
                                 )
                             }
                         }
                     }
-// --- HIER ENDET DIE LAZYROW ---
+
+                    // Bestätigungs-Dialog für das Blockieren von Tags
+                    tagToBlock?.let { tag ->
+                        AlertDialog(
+                            onDismissRequest = { tagToBlock = null },
+                            title = { Text("Tag blockieren?") },
+                            text = { Text("Möchtest du den Tag '#$tag' blockieren? Beiträge mit diesem Tag werden nicht mehr angezeigt.") },
+                            confirmButton = {
+                                Button(onClick = {
+                                    viewModel.addBlacklistTag(tag) // Korrekter Aufruf für Tags
+                                    tagToBlock = null
+                                }) { Text("Blockieren") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { tagToBlock = null }) { Text("Abbrechen") }
+                            }
+                        )
+                    }
 
                     Box(
                         modifier = Modifier

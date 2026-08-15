@@ -58,7 +58,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Auto Replay Videos", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Videos automatisch von vorne abspielen",
+                        "videos automatically start from the beginning",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

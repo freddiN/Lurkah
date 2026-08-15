@@ -166,6 +166,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             blacklistedUsers.collect {
                 loadViralPosts(isRefresh = true)
             }
+            viewModelScope.launch {
+                blacklistedTags.collect { loadViralPosts(isRefresh = true) }
+            }
         }
     }
 
@@ -184,9 +187,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = api.getMostViral(authHeader = clientId, page = currentPage)
                 if (response.success) {
                     val currentBlacklist = blacklistedUsers.value.map { it.lowercase() }
+                    val currentBlacklistTags = blacklistedTags.value.map { it.lowercase() }
                     val filtered = response.data.filter { post ->
                         val author = post.accountUrl?.lowercase() ?: ""
-                        !currentBlacklist.contains(author) && post.mediaUrl != null
+                        val hasBlockedTag = post.tags.any { currentBlacklistTags.contains(it.lowercase()) }
+
+                        !currentBlacklist.contains(author) && !hasBlockedTag && post.mediaUrl != null
                     }
 
                     if (isRefresh) {
@@ -231,5 +237,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeBlacklistUser(username: String) {
         viewModelScope.launch { settingsManager.removeBlacklistedUser(username) }
+    }
+
+    val blacklistedTags: StateFlow<Set<String>> = settingsManager.blacklistedTags.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptySet()
+    )
+
+    fun addBlacklistTag(tag: String) {
+        viewModelScope.launch { settingsManager.addBlacklistedTag(tag) }
+    }
+
+    fun removeBlacklistTag(tag: String) {
+        viewModelScope.launch { settingsManager.removeBlacklistedTag(tag) }
     }
 }
