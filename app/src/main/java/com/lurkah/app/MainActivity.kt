@@ -791,57 +791,60 @@ fun VideoPlayer(
     onDoubleClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
 
-    val exoPlayer = remember(videoUrl, autoReplay, autoPlayVideos) {
+    // 1. Player erstellen
+    val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
-            repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-            volume = if (isMuted) 0f else 1f
-            pauseAtEndOfMediaItems = !autoReplay
             prepare()
-            playWhenReady = autoPlayVideos
         }
     }
 
-    DisposableEffect(videoUrl, autoReplay, autoPlayVideos) {
+    // 2. Player-Parameter bei Änderungen aktualisieren (ohne den Player neu zu bauen)
+    LaunchedEffect(autoReplay, autoPlayVideos, isMuted) {
+        exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+        exoPlayer.volume = if (isMuted) 0f else 1f
+        exoPlayer.playWhenReady = autoPlayVideos
+    }
+
+    // 3. Cleanup
+    DisposableEffect(videoUrl) {
         onDispose {
-            exoPlayer.pause()
-            exoPlayer.clearVideoSurface() // Wichtig: Trennt die Oberfläche, verhindert den schwarzen Aufblitzeffekt
-            exoPlayer.clearMediaItems()
             exoPlayer.release()
         }
     }
 
-    Box(
-        modifier = modifier.background(Color.Transparent) // Auf Transparent setzen statt Surface-Farbe
-    ) {
+    // 4. AndroidView mit korrekter Update-Logik
+    Box(modifier = modifier.background(Color.Black)) {
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = showControls
                     controllerAutoShow = false
-                    hideController()
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-
-                    // Verhindert das schwarze Aufblitzen des Standard-Shutters vom PlayerView
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
+                    // Gesture Handling hier sauber halten
                     val gestureDetector = android.view.GestureDetector(
                         ctx,
                         object : android.view.GestureDetector.SimpleOnGestureListener() {
                             override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
-                                currentOnDoubleClick?.invoke()
+                                onDoubleClick?.invoke()
                                 return true
                             }
                         }
                     )
-
                     setOnTouchListener { _, event ->
                         gestureDetector.onTouchEvent(event)
-                        false
+                        true // true zurückgeben, damit Touch-Events konsumiert werden
                     }
+                }
+            },
+            update = { playerView ->
+                // Wenn sich der Player ändert, hier zuweisen
+                if (playerView.player != exoPlayer) {
+                    playerView.player = exoPlayer
                 }
             },
             modifier = Modifier.fillMaxSize()
