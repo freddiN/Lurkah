@@ -1,4 +1,4 @@
-package com.example.imgurapp
+package com.viralgur.app
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
