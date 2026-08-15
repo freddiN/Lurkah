@@ -273,18 +273,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsManager.removeBlacklistedTag(tag) }
     }
 
-    fun loadFullAlbumDetails(postId: String, indexInList: Int) {
-        val post = posts.getOrNull(indexInList) ?: return
-        if (post.images.isNullOrEmpty() || (post.images?.size ?: 0) > 1) return
+    val albumImagesCache = androidx.compose.runtime.mutableStateMapOf<String, List<ImgurImage>>()
+
+    fun loadFullAlbumDetails(postId: String) {
+        if (albumImagesCache.containsKey(postId)) return
 
         viewModelScope.launch {
             try {
                 val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
                 if (response.success && !response.data.images.isNullOrEmpty()) {
-                    if (response.data.images!!.size != post.images?.size) {
-                        val updatedPost = post.copy(images = response.data.images)
-                        posts[indexInList] = updatedPost
-                    }
+                    albumImagesCache[postId] = response.data.images!!
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

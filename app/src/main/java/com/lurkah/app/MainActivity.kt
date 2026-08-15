@@ -404,6 +404,10 @@ fun FullScreenMediaViewer(
             ) { page ->
                 val post = posts.getOrNull(page) ?: return@HorizontalPager
                 val isCurrentPage = pagerState.currentPage == page
+
+                // Nutzen des Caches für Album-Bilder, falls vorhanden, sonst Fallback auf das initiale Post-Bild
+                val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
+
                 var scale by remember { mutableFloatStateOf(1f) }
                 var offsetX by remember { mutableFloatStateOf(0f) }
                 var offsetY by remember { mutableFloatStateOf(0f) }
@@ -435,9 +439,9 @@ fun FullScreenMediaViewer(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        val displayItems = remember(post.images, post.mediaUrl) {
-                            val rawList = if (!post.images.isNullOrEmpty()) {
-                                post.images!!
+                        val displayItems = remember(currentImages, post.mediaUrl) {
+                            val rawList = if (!currentImages.isNullOrEmpty()) {
+                                currentImages
                             } else if (post.mediaUrl != null) {
                                 listOf(
                                     ImgurImage(
@@ -471,7 +475,7 @@ fun FullScreenMediaViewer(
                                     autoReplay = autoReplay,
                                     autoPlayVideos = autoPlayVideos && isCurrentPage,
                                     showControls = true,
-                                    startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L, // <--- Position anwenden
+                                    startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else if (itemUrl != null) {
@@ -608,7 +612,7 @@ fun PostDetailBottomSheet(
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             viewModel.loadCommentsForPost(post.id)
-            viewModel.loadFullAlbumDetails(post.id, pagerState.currentPage)
+            viewModel.loadFullAlbumDetails(post.id) // Lädt Album-Bilder in den Cache, ohne die Posts-Liste zu stören
         }
     }
 
@@ -621,6 +625,9 @@ fun PostDetailBottomSheet(
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
             val isCurrentPage = pagerState.currentPage == page
+
+            // Nutzen des Caches für Album-Bilder, falls vorhanden, sonst Fallback auf das initiale Post-Bild
+            val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
 
             LazyColumn(
                 modifier = Modifier
@@ -680,9 +687,9 @@ fun PostDetailBottomSheet(
                             .fillMaxWidth()
                             .wrapContentHeight()
                     ) {
-                        val displayItems = remember(post.images, post.mediaUrl) {
-                            val rawList = if (!post.images.isNullOrEmpty()) {
-                                post.images!!
+                        val displayItems = remember(currentImages, post.mediaUrl) {
+                            val rawList = if (!currentImages.isNullOrEmpty()) {
+                                currentImages
                             } else if (post.mediaUrl != null) {
                                 listOf(
                                     ImgurImage(
