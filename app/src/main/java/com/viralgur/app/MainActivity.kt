@@ -8,6 +8,7 @@ package com.viralgur.app
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -72,6 +73,11 @@ class MainActivity : ComponentActivity() {
 fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean) {
     var currentScreen by remember { mutableStateOf("feed") }
     val blacklistedUsers by viewModel.blacklistedUsers.collectAsState()
+
+    // Fängt die Android-Zurück-Geste ab, wenn die Settings offen sind
+    BackHandler(enabled = currentScreen == "settings") {
+        currentScreen = "feed"
+    }
 
     if (currentScreen == "settings") {
         SettingsScreen(
