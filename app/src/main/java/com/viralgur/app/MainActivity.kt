@@ -83,6 +83,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
     var currentScreen by remember { mutableStateOf("feed") }
     val blacklistedUsers by viewModel.blacklistedUsers.collectAsState()
     val blacklistedTags by viewModel.blacklistedTags.collectAsState()
+    val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
     BackHandler(enabled = currentScreen == "settings") {
         currentScreen = "feed"
@@ -91,10 +92,12 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
     if (currentScreen == "settings") {
         SettingsScreen(
             isDarkMode = isDarkMode,
+            autoPlayVideos = autoPlayVideos,
             autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
             blacklistedTags = blacklistedTags,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
+            onAutoPlayVideosToggle = { viewModel.toggleAutoPlayVideos(it) },
             onAutoReplayToggle = { viewModel.toggleAutoPlay(it) },
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
@@ -696,7 +699,7 @@ fun VideoPlayer(
             volume = if (isMuted) 0f else 1f
             pauseAtEndOfMediaItems = !autoReplay
             prepare()
-            playWhenReady = true
+            playWhenReady = autoPlayVideos
         }
     }
 

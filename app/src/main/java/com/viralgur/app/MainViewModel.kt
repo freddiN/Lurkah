@@ -113,16 +113,26 @@ interface ImgurApiService {
 
 // --- VIEWMODEL ---
 class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val clientId = "Client-ID 546c25a59c58ad7"
+    private val clientId = "Client-ID 546c25a59c58ad7" // public anonymous client
     private val settingsManager = SettingsManager(application)
-    // -- NEU: AutoPlay Status --
+
     private val _autoPlayVideos = MutableStateFlow(false)
     val autoPlayVideos: StateFlow<Boolean> = _autoPlayVideos.asStateFlow()
 
     fun toggleAutoPlay(enabled: Boolean) {
         _autoPlayVideos.value = enabled
     }
-    // -------------------------
+
+    val autoPlayVideos: StateFlow<Boolean> = settingsManager.autoPlayVideos.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = true // Standardmässig an
+    )
+
+    fun toggleAutoPlayVideos(enabled: Boolean) {
+        viewModelScope.launch { settingsManager.setAutoPlayVideos(enabled) }
+    }
+
 
     val isDarkMode: StateFlow<Boolean> = settingsManager.isDarkMode.stateIn(
         scope = viewModelScope,

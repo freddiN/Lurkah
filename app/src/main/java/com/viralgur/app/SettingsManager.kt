@@ -15,9 +15,8 @@ class SettingsManager(private val context: Context) {
     companion object {
         private val DARK_MODE_KEY = booleanPreferencesKey("dark_mode")
         private val BLACKLISTED_USERS_KEY = stringSetPreferencesKey("blacklisted_users")
-
-        // NEU: Schritt 1 - Der Schlüssel für die Tags
         private val BLACKLISTED_TAGS_KEY = stringSetPreferencesKey("blacklisted_tags")
+        private val AUTO_PLAY_VIDEOS_KEY = booleanPreferencesKey("auto_play_videos")
     }
 
     val isDarkMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -28,9 +27,18 @@ class SettingsManager(private val context: Context) {
         preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
     }
 
-    // NEU: Schritt 2 - Die Tags auslesen
     val blacklistedTags: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[BLACKLISTED_TAGS_KEY] ?: emptySet()
+    }
+
+    val autoPlayVideos: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_PLAY_VIDEOS_KEY] ?: true
+    }
+
+    suspend fun setAutoPlayVideos(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_PLAY_VIDEOS_KEY] = enabled
+        }
     }
 
     suspend fun setDarkMode(enabled: Boolean) {

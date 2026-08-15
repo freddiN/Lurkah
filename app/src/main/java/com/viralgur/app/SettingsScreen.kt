@@ -15,10 +15,12 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SettingsScreen(
     isDarkMode: Boolean,
+    autoPlayVideos: Boolean,
     autoReplay: Boolean,
     blacklistedUsers: Set<String>,
     blacklistedTags: Set<String>,
     onDarkModeToggle: (Boolean) -> Unit,
+    onAutoPlayVideosToggle: (Boolean) -> Unit,
     onAutoReplayToggle: (Boolean) -> Unit,
     onAddBlacklistUser: (String) -> Unit,
     onRemoveBlacklistUser: (String) -> Unit,
@@ -52,6 +54,24 @@ fun SettingsScreen(
                 ) {
                     Text("Dark Mode", style = MaterialTheme.typography.titleMedium)
                     Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Auto-Play Videos", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "videos start playing automatically when visible",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = autoPlayVideos, onCheckedChange = onAutoPlayVideosToggle)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
