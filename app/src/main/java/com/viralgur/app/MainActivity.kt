@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val isDarkMode by mainViewModel.isDarkMode.collectAsState()
-            val autoReplay = false // Vorübergehend hartcodiert, bis das ViewModel aktualisiert ist
+            val autoReplay by mainViewModel.autoPlayVideos.collectAsState()
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
@@ -93,7 +93,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
-            onAutoReplayToggle = { /* viewModel.toggleAutoPlay(it) */ },
+            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) }
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             modifier = Modifier.systemBarsPadding()
@@ -552,6 +552,23 @@ fun PostDetailBottomSheet(
                         color = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
+
+// --- HIER STARTET DIE NEUE LAZYROW FÜR DIE TAGS ---
+                    if (post.tags.isNotEmpty()) {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            modifier = Modifier.padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // Nimm maximal 5 Tags, damit es nicht zu unübersichtlich wird
+                            items(post.tags.take(5)) { tag ->
+                                SuggestionChip(
+                                    onClick = { viewModel.addBlacklistUser(tag) },
+                                    label = { Text("#$tag") }
+                                )
+                            }
+                        }
+                    }
+// --- HIER ENDET DIE LAZYROW ---
 
                     Box(
                         modifier = Modifier

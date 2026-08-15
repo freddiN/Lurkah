@@ -19,6 +19,9 @@ import retrofit2.http.Header
 import retrofit2.http.Path
 import java.util.Locale
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 // --- DATA MODELS ---
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
 data class ImgurCommentsResponse(val data: List<ImgurComment>, val success: Boolean)
@@ -27,8 +30,13 @@ data class ImgurPost(
     val id: String,
     val title: String,
     @SerializedName("account_url") val accountUrl: String?,
-    val images: List<ImgurImage>?
+    val images: List<ImgurImage>?,
+    @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList() // Liest die Tags aus der API
 ) {
+    // Wandelt die API-Tags in eine einfache Liste von Strings für die UI um
+    val tags: List<String>
+        get() = rawTags?.map { it.name } ?: emptyList()
+
     private val mainMedia: ImgurImage? get() = images?.firstOrNull()
 
     val mediaUrl: String?
@@ -66,6 +74,11 @@ data class ImgurPost(
         }
 }
 
+// Das Modell für die Tags der Imgur API
+data class ImgurTag(
+    val name: String
+)
+
 data class ImgurImage(
     val id: String,
     val link: String,
@@ -102,6 +115,14 @@ interface ImgurApiService {
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val clientId = "Client-ID 546c25a59c58ad7"
     private val settingsManager = SettingsManager(application)
+    // -- NEU: AutoPlay Status --
+    private val _autoPlayVideos = MutableStateFlow(false)
+    val autoPlayVideos: StateFlow<Boolean> = _autoPlayVideos.asStateFlow()
+
+    fun toggleAutoPlay(enabled: Boolean) {
+        _autoPlayVideos.value = enabled
+    }
+    // -------------------------
 
     val isDarkMode: StateFlow<Boolean> = settingsManager.isDarkMode.stateIn(
         scope = viewModelScope,
