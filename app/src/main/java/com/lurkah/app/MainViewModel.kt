@@ -209,7 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (isRefresh) {
                         posts.clear()
                     }
-                    val existingIds = posts.map { id }.toSet()
+                    val existingIds = posts.map { it.id }.toSet()
                     val newUniquePosts = filtered.filter { !existingIds.contains(it.id) }
 
                     posts.addAll(newUniquePosts)
