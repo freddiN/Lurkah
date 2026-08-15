@@ -46,15 +46,11 @@ fun PostDetailBottomSheet(
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { viewModel.posts.size })
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
-    // Lädt Kommentare und Album-Details NUR beim ersten Erreichen der Seite und bricht danach ab,
-    // um jegliche Loops oder Feed-Updates zu verhindern.
+    // FIX: Lädt NUR die Kommentare. Kein automatisches Neuladen von Alben, das den Hauptfeed triggert.
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             viewModel.loadCommentsForPost(post.id)
-            if (post.images.isNullOrEmpty() && !post.mediaUrl.isNullOrEmpty()) {
-                viewModel.loadFullAlbumDetails(post.id, pagerState.currentPage)
-            }
         }
     }
 
@@ -64,7 +60,7 @@ fun PostDetailBottomSheet(
     ) {
         HorizontalPager(
             state = pagerState,
-            beyondViewportPageCount = 1, // Hält benachbarte Seiten im Speicher, verhindert schwarze Bildschirme beim Swipen
+            beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
@@ -143,7 +139,7 @@ fun PostDetailBottomSheet(
                                         videoUrl = itemUrl,
                                         isMuted = false,
                                         autoReplay = autoReplay,
-                                        autoPlayVideos = autoPlayVideos && isCurrentPage, // Spielt nur in der aktiven Seite
+                                        autoPlayVideos = autoPlayVideos && isCurrentPage,
                                         showControls = true,
                                         onDoubleClick = { onDoubleClick(page) },
                                         modifier = Modifier
@@ -154,13 +150,16 @@ fun PostDetailBottomSheet(
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(itemUrl)
-                                            .crossfade(true)
+                                            .crossfade(false) // FIX: Verhindert Flackern/Verschwinden bei Recomposition
+                                            .memoryCachePolicy(CachePolicy.ENABLED)
+                                            .diskCachePolicy(CachePolicy.ENABLED)
                                             .build(),
                                         contentDescription = "${post.title} - ${imgIndex + 1}",
                                         contentScale = ContentScale.Fit,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .heightIn(min = 250.dp, max = 350.dp)
+                                            .background(Color.DarkGray.copy(alpha = 0.1f)) // Platzhalter-Hintergrund
                                             .pointerInput(Unit) {
                                                 detectTapGestures(
                                                     onDoubleTap = { onDoubleClick(page) }
@@ -179,19 +178,22 @@ fun PostDetailBottomSheet(
                                 onDoubleClick = { onDoubleClick(page) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(min = 250.dp, max = 350.dp)
+                                    .heightIn(max = 350.dp)
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(post.mediaUrl)
-                                    .crossfade(true)
+                                    .crossfade(false)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
                                     .build(),
                                 contentDescription = post.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 250.dp, max = 350.dp)
+                                    .background(Color.DarkGray.copy(alpha = 0.1f))
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { onDoubleClick(page) }
@@ -256,7 +258,7 @@ fun FullScreenMediaViewer(
     initialIndex: Int,
     posts: List<ImgurPost>,
     autoReplay: Boolean,
-    onDismiss: (Int) -> Unit // Übergibt den aktuellen Index beim Schließen
+    onDismiss: (Int) -> Unit
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
@@ -313,7 +315,6 @@ fun FullScreenMediaViewer(
                         val imgurImages = post.images
 
                         if (!imgurImages.isNullOrEmpty()) {
-                            // Im Vollbild für Alben das erste oder aktive Bild/Video anzeigen
                             val firstImg = imgurImages.firstOrNull()
                             val itemUrl = firstImg?.mp4 ?: firstImg?.link ?: post.mediaUrl
                             val isItemVideo = (firstImg?.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
@@ -329,7 +330,12 @@ fun FullScreenMediaViewer(
                                 )
                             } else if (itemUrl != null) {
                                 AsyncImage(
-                                    model = itemUrl,
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(itemUrl)
+                                        .crossfade(false)
+                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                                        .diskCachePolicy(CachePolicy.ENABLED)
+                                        .build(),
                                     contentDescription = post.title,
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier
@@ -360,7 +366,12 @@ fun FullScreenMediaViewer(
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
-                                model = post.mediaUrl,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(post.mediaUrl)
+                                    .crossfade(false)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .build(),
                                 contentDescription = post.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
@@ -401,7 +412,7 @@ fun FullScreenMediaViewer(
 fun CommentItem(
     comment: ImgurComment,
     depth: Int = 0,
-    onImageReferenceClick: (Int) -> Unit // Neuer Callback für den Bildindex
+    onImageReferenceClick: (Int) -> Unit
 ) {
     val maxDepth = 4
     val currentIndent = depth.coerceAtMost(maxDepth)
@@ -460,7 +471,6 @@ fun CommentItem(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Kommentartext parsen und Bild-Referenzen klickbar machen
             CommentTextWithImageLinks(commentText = comment.comment, onImageReferenceClick = onImageReferenceClick)
 
             comment.children?.forEach { childComment ->
@@ -476,7 +486,6 @@ fun CommentTextWithImageLinks(
     commentText: String,
     onImageReferenceClick: (Int) -> Unit
 ) {
-    // Regex, der nach # gefolgt von Zahlen sucht (z.B. #1, #10)
     val regex = Regex("#(\\d+)")
     val matches = regex.findAll(commentText).toList()
 
@@ -484,10 +493,6 @@ fun CommentTextWithImageLinks(
         Text(text = commentText, style = MaterialTheme.typography.bodyMedium)
         return
     }
-
-    // Wir teilen den Text auf und bauen eine Zeile/FlowRow mit klickbaren Elementen
-    // Für eine einfache Umsetzung nutzen wir Annotations oder splitten den Text textuell.
-    // Ein sehr robuster Weg in Compose ist die Nutzung von Text mit ClickableText oder einer Kombination.
 
     val annotatedString = androidx.compose.ui.text.buildAnnotatedString {
         var lastIndex = 0
@@ -521,7 +526,6 @@ fun CommentTextWithImageLinks(
                 .firstOrNull()?.let { annotation ->
                     val pageNumber = annotation.item.toIntOrNull()
                     if (pageNumber != null && pageNumber > 0) {
-                        // Imgur zählt meist von 1 aufwärts, Arrays in Kotlin von 0 -> pageNumber - 1
                         onImageReferenceClick(pageNumber - 1)
                     }
                 }
