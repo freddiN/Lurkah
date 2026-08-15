@@ -1,4 +1,4 @@
-package com.viralgur.app
+package com.lurkah.app
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey

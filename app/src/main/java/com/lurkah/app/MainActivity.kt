@@ -4,7 +4,7 @@
     androidx.media3.common.util.UnstableApi::class
 )
 
-package com.viralgur.app
+package com.lurkah.app
 
 import android.net.Uri
 import android.os.Bundle

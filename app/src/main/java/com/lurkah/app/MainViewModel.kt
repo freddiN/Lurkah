@@ -1,4 +1,4 @@
-package com.viralgur.app
+package com.lurkah.app
 
 import android.app.Application
 import androidx.compose.runtime.getValue

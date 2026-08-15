@@ -1,26 +1,28 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    
-    <!-- Äußerer pulsierender Kreis/Ring -->
-    <path
-        android:pathData="M54,22 C36.33,22 22,36.33 22,54 C22,71.67 36.33,86 54,86 C71.67,86 86,71.67 86,54"
-        android:strokeWidth="4"
-        android:strokeColor="#1BB76E"
-        android:strokeLineCap="round"/>
+        android:width="108dp"
+        android:height="108dp"
+        android:viewportWidth="108"
+        android:viewportHeight="108">
 
-    <!-- Das stilisierte "V" mit integrierter Play-Welle -->
+    <!-- Äußerer perfekter Kreis -->
     <path
-        android:pathData="M38,40 L54,68 L70,40"
-        android:strokeWidth="8"
-        android:strokeColor="#1BB76E"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"/>
+            android:pathData="M54,16 C76.09,16 94,33.91 94,56 C94,78.09 76.09,96 54,96 C31.91,96 14,78.09 14,56 C14,33.91 31.91,16 54,16 Z"
+            android:strokeWidth="5"
+            android:strokeColor="#1BB76E"
+            android:fillColor="#00000000"
+            android:strokeLineCap="round"/>
 
-    <!-- Kleiner leuchtender Puls-Punkt -->
+    <!-- Das "L" im Zentrum -->
     <path
-        android:pathData="M78,32 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"
-        android:fillColor="#00FF88"/>
+            android:pathData="M42,44 L42,68 L66,68"
+            android:strokeWidth="8"
+            android:strokeColor="#1BB76E"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"/>
+
+    <!-- Der leuchtende i-Punkt exakt auf dem oberen Ende des L-Striches -->
+    <path
+            android:pathData="M42,32 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"
+            android:fillColor="#00FF88"/>
 </vector>

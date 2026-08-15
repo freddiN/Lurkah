@@ -1,4 +1,4 @@
-package com.viralgur.app
+package com.lurkah.app
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

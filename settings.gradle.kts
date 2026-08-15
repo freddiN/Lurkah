@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Viralgur"
+rootProject.name = "Lurkah"
 include(":app")
