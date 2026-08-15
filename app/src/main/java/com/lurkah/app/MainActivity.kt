@@ -240,13 +240,16 @@ fun ImgurFeedScreen(
             }
 
             selectedPostIndex?.let { initialIndex ->
+                // Variable, um sich die aktuelle Videoposition im BottomSheet zu merken
+                var lastVideoPosition by remember { mutableStateOf(0L) }
+
                 PostDetailBottomSheet(
                     initialIndex = initialIndex,
                     viewModel = viewModel,
                     autoReplay = autoReplay,
                     onDismiss = { selectedPostIndex = null },
-                    onDoubleClick = { index ->
-                        // BottomSheet schließen und sofort den Vollbild-Viewer mit demselben Index öffnen
+                    onDoubleClick = { index, position ->
+                        lastVideoPosition = position // Position zwischenspeichern
                         selectedPostIndex = null
                         fullScreenPostIndex = index
                     }
@@ -258,8 +261,8 @@ fun ImgurFeedScreen(
                     initialIndex = initialIndex,
                     posts = viewModel.posts,
                     autoReplay = autoReplay,
+                    initialPlaybackPosition = lastVideoPosition, // Falls gewünscht übergeben
                     onDismiss = { index ->
-                        // Vollbild schließen und das BottomSheet beim selben Index wieder öffnen!
                         fullScreenPostIndex = null
                         selectedPostIndex = index
                     }
@@ -365,7 +368,8 @@ fun FullScreenMediaViewer(
     initialIndex: Int,
     posts: List<ImgurPost>,
     autoReplay: Boolean,
-    onDismiss: (Int) -> Unit // Übergibt den aktuellen Index beim Schließen
+    initialPlaybackPosition: Long = 0L, // <--- Neu: Startposition übergeben
+    onDismiss: (Int) -> Unit
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
@@ -420,7 +424,7 @@ fun FullScreenMediaViewer(
                         contentAlignment = Alignment.Center
                     ) {
                         val displayItems = remember(post.images, post.mediaUrl) {
-                            if (!post.images.isNullOrEmpty()) {
+                            val rawList = if (!post.images.isNullOrEmpty()) {
                                 post.images!!
                             } else if (post.mediaUrl != null) {
                                 listOf(
@@ -433,10 +437,9 @@ fun FullScreenMediaViewer(
                                     )
                                 )
                             } else {
-                                emptyList()
+                                emptyList<ImgurImage>()
                             }
 
-                            // .gifv Endungen automatisch auf .mp4 mappen, damit Coil/Player nicht fehlschlagen
                             rawList.map { img ->
                                 val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
                                 val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
@@ -445,7 +448,6 @@ fun FullScreenMediaViewer(
                         }
 
                         if (displayItems.isNotEmpty()) {
-                            // Im Vollbild für Alben das erste Bild/Video anzeigen
                             val firstImg = displayItems.first()
                             val itemUrl = firstImg.mp4 ?: firstImg.link
                             val isItemVideo = (firstImg.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
@@ -457,6 +459,7 @@ fun FullScreenMediaViewer(
                                     autoReplay = autoReplay,
                                     autoPlayVideos = autoPlayVideos && isCurrentPage,
                                     showControls = true,
+                                    startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L, // <--- Position anwenden
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else if (itemUrl != null) {
@@ -581,17 +584,18 @@ fun PostDetailBottomSheet(
     viewModel: MainViewModel,
     autoReplay: Boolean,
     onDismiss: () -> Unit,
-    onDoubleClick: (Int) -> Unit
+    onDoubleClick: (Int, Long) -> Unit
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { viewModel.posts.size })
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
+    var activePlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             viewModel.loadCommentsForPost(post.id)
-            // Lade die restlichen Album-Bilder nach, falls das Album größer ist
             viewModel.loadFullAlbumDetails(post.id, pagerState.currentPage)
         }
     }
@@ -604,7 +608,6 @@ fun PostDetailBottomSheet(
                 .background(MaterialTheme.colorScheme.surface)
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
-            // Prüfen, ob diese Seite gerade wirklich aktiv (sichtbar) ist
             val isCurrentPage = pagerState.currentPage == page
 
             LazyColumn(
@@ -647,12 +650,12 @@ fun PostDetailBottomSheet(
                         AlertDialog(
                             onDismissRequest = { tagToBlock = null },
                             title = { Text("Block Tag?") },
-                            text = { Text("Du you wan to block the tag '#$tag' ? Entries with this tag will be hidden.") },
+                            text = { Text("Do you want to block the tag '#$tag'? Entries with this tag will be hidden.") },
                             confirmButton = {
                                 Button(onClick = {
                                     viewModel.addBlacklistTag(tag)
                                     tagToBlock = null
-                                }) { Text("Blockieren") }
+                                }) { Text("Block") }
                             },
                             dismissButton = {
                                 TextButton(onClick = { tagToBlock = null }) { Text("Cancel") }
@@ -665,9 +668,8 @@ fun PostDetailBottomSheet(
                             .fillMaxWidth()
                             .wrapContentHeight()
                     ) {
-                        // Einheitliche Liste erzeugen, um UI-Sprünge ("Verschwinden") zu verhindern
                         val displayItems = remember(post.images, post.mediaUrl) {
-                            if (!post.images.isNullOrEmpty()) {
+                            val rawList = if (!post.images.isNullOrEmpty()) {
                                 post.images!!
                             } else if (post.mediaUrl != null) {
                                 listOf(
@@ -680,10 +682,9 @@ fun PostDetailBottomSheet(
                                     )
                                 )
                             } else {
-                                emptyList()
+                                emptyList<ImgurImage>()
                             }
 
-                            // .gifv Endungen automatisch auf .mp4 mappen, damit Coil/Player nicht fehlschlagen
                             rawList.map { img ->
                                 val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
                                 val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
@@ -696,40 +697,22 @@ fun PostDetailBottomSheet(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             displayItems.forEachIndexed { imgIndex, img ->
-                                val itemUrl = img.mp4 ?: img.link
-                                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
-
-                                if (isItemVideo && itemUrl != null) {
-                                    VideoPlayer(
-                                        videoUrl = itemUrl,
-                                        isMuted = false,
-                                        autoReplay = autoReplay,
-                                        autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                        showControls = true,
-                                        onDoubleClick = { onDoubleClick(page) },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(max = 350.dp)
-                                    )
-                                } else if (itemUrl != null) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(itemUrl)
-                                            .diskCachePolicy(CachePolicy.ENABLED)
-                                            .memoryCachePolicy(CachePolicy.ENABLED)
-                                            .build(),
-                                        contentDescription = "${post.title} - ${imgIndex + 1}",
-                                        contentScale = ContentScale.Fit,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(max = 350.dp)
-                                            .pointerInput(Unit) {
-                                                detectTapGestures(
-                                                    onDoubleTap = { onDoubleClick(page) }
-                                                )
-                                            }
-                                    )
-                                }
+                                DetailMediaItem(
+                                    img = img,
+                                    imgIndex = imgIndex,
+                                    post = post,
+                                    isCurrentPage = isCurrentPage,
+                                    autoReplay = autoReplay,
+                                    autoPlayVideos = autoPlayVideos,
+                                    onDoubleClick = { currentPos ->
+                                        onDoubleClick(page, currentPos)
+                                    },
+                                    onPlayerReady = { player ->
+                                        if (player != null) {
+                                            activePlayer = player
+                                        }
+                                    }
+                                )
                             }
                         }
                     }
@@ -784,6 +767,7 @@ fun VideoPlayer(
     autoPlayVideos: Boolean,
     modifier: Modifier = Modifier,
     showControls: Boolean = true,
+    startPositionMs: Long = 0L, // <--- Neu
     onDoubleClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -791,6 +775,9 @@ fun VideoPlayer(
     val exoPlayer = remember(videoUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
+            if (startPositionMs > 0L) {
+                seekTo(startPositionMs) // <--- Springt zur exakten Position beim Start
+            }
             prepare()
         }
     }
@@ -828,7 +815,7 @@ fun VideoPlayer(
                     )
                     setOnTouchListener { _, event ->
                         gestureDetector.onTouchEvent(event)
-                        false // WICHTIG: false, damit PlayerView die Touch-Events für Controls behält!
+                        false
                     }
                 }
             },
@@ -884,4 +871,107 @@ fun Modifier.verticalScrollbar(
         size = Size(thumbWidth.toPx(), scrollbarHeight),
         cornerRadius = CornerRadius(thumbWidth.toPx() / 2, thumbWidth.toPx() / 2)
     )
+}
+
+@Composable
+fun DetailMediaItem(
+    img: ImgurImage,
+    imgIndex: Int,
+    post: ImgurPost,
+    isCurrentPage: Boolean,
+    autoReplay: Boolean,
+    autoPlayVideos: Boolean,
+    onDoubleClick: (Long) -> Unit,
+    onPlayerReady: (ExoPlayer?) -> Unit
+) {
+    val itemUrl = img.mp4 ?: img.link
+    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+
+    if (isItemVideo && itemUrl != null) {
+        val context = LocalContext.current
+        var localPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+
+        val exoPlayer = remember(itemUrl) {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(Uri.parse(itemUrl)))
+                prepare()
+            }
+        }
+
+        LaunchedEffect(exoPlayer) {
+            localPlayer = exoPlayer
+            if (isCurrentPage) onPlayerReady(exoPlayer)
+        }
+
+        LaunchedEffect(autoReplay, autoPlayVideos, isCurrentPage) {
+            exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            exoPlayer.playWhenReady = autoPlayVideos && isCurrentPage
+            if (isCurrentPage) onPlayerReady(exoPlayer)
+        }
+
+        DisposableEffect(itemUrl) {
+            onDispose {
+                exoPlayer.release()
+                onPlayerReady(null)
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 350.dp)
+                .background(Color.Black)
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = true
+                        controllerAutoShow = false
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+
+                        val gestureDetector = android.view.GestureDetector(
+                            ctx,
+                            object : android.view.GestureDetector.SimpleOnGestureListener() {
+                                override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                                    val currentPos = localPlayer?.currentPosition ?: 0L
+                                    onDoubleClick(currentPos)
+                                    return true
+                                }
+                            }
+                        )
+                        setOnTouchListener { _, event ->
+                            gestureDetector.onTouchEvent(event)
+                            false
+                        }
+                    }
+                },
+                update = { playerView ->
+                    if (playerView.player != exoPlayer) {
+                        playerView.player = exoPlayer
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    } else if (itemUrl != null) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(itemUrl)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .build(),
+            contentDescription = "${post.title} - ${imgIndex + 1}",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 350.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = { onDoubleClick(0L) }
+                    )
+                }
+        )
+    }
 }
