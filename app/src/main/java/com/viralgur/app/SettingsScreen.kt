@@ -17,10 +17,13 @@ fun SettingsScreen(
     isDarkMode: Boolean,
     autoReplay: Boolean,
     blacklistedUsers: Set<String>,
+    blacklistedTags: Set<String>,
     onDarkModeToggle: (Boolean) -> Unit,
     onAutoReplayToggle: (Boolean) -> Unit,
     onAddBlacklistUser: (String) -> Unit,
     onRemoveBlacklistUser: (String) -> Unit,
+    onAddBlacklistTag: (String) -> Unit,
+    onRemoveBlacklistTag: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
