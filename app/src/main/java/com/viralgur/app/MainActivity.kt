@@ -24,12 +24,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -98,6 +100,19 @@ fun ImgurFeedScreen(
     var userToBlock by remember { mutableStateOf<String?>(null) }
 
     val gridState = rememberLazyGridState()
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.loadViralPosts(isRefresh = true)
+        }
+    }
+
+    LaunchedEffect(viewModel.isRefreshing) {
+        if (!viewModel.isRefreshing) {
+            pullToRefreshState.endRefresh()
+        }
+    }
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -125,12 +140,11 @@ fun ImgurFeedScreen(
             )
         }
     ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = viewModel.isRefreshing,
-            onRefresh = { viewModel.loadViralPosts(isRefresh = true) },
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -163,6 +177,11 @@ fun ImgurFeedScreen(
                     }
                 }
             }
+
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
 
             userToBlock?.let { author ->
                 AlertDialog(
