@@ -62,7 +62,10 @@ class MainActivity : ComponentActivity() {
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     ImgurAppContent(
                         viewModel = mainViewModel,
                         isDarkMode = isDarkMode,
@@ -157,6 +160,7 @@ fun ImgurFeedScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .nestedScroll(pullToRefreshState.nestedScrollConnection)
         ) {
@@ -522,7 +526,9 @@ fun PostDetailBottomSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.9f)) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
 
@@ -654,19 +660,22 @@ fun VideoPlayer(
         }
     }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = showControls
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    setSurfaceType(PlayerView.SURFACE_TYPE_TEXTURE_VIEW)
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Nur ein transparenter Layer für Doppeltap, der einfache Taps (Controls einblenden) durchlässt
         if (currentOnDoubleClick != null) {
             Box(
                 modifier = Modifier
