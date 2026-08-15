@@ -293,6 +293,14 @@ fun SmartMediaCard(
     val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
     val context = LocalContext.current
 
+    // Ermitteln, ob es ein Album ist und wie viele Bilder es hat
+    val imageCount = post.images?.size ?: 1
+    val labelText = if (imageCount > 1) {
+        "📁 ALBUM ($imageCount)"
+    } else {
+        "${post.typeLabel} • ${post.formattedSize}"
+    }
+
     Card(
         modifier = Modifier
             .padding(4.dp)
@@ -313,7 +321,6 @@ fun SmartMediaCard(
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(post.thumbnailUrl)
-                        //.crossfade(true)
                         .diskCachePolicy(CachePolicy.ENABLED)
                         .memoryCachePolicy(CachePolicy.ENABLED)
                         .build(),
@@ -349,7 +356,7 @@ fun SmartMediaCard(
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Text(
-                        text = "${post.typeLabel} • ${post.formattedSize}",
+                        text = labelText,
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -629,7 +636,6 @@ fun PostDetailBottomSheet(
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
             val isCurrentPage = pagerState.currentPage == page
 
-            // Hole Album-Bilder aus dem Cache oder Fallback auf Post-Bilder
             val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
 
             LazyColumn(
@@ -645,8 +651,15 @@ fun PostDetailBottomSheet(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
+                    val imageCount = currentImages?.size ?: post.images?.size ?: 1
+                    val typeLabelText = if (imageCount > 1) {
+                        "📁 ALBUM ($imageCount items)"
+                    } else {
+                        "${post.typeLabel} • File size: ${post.formattedSize}"
+                    }
+
                     Text(
-                        text = "${post.typeLabel} • File size: ${post.formattedSize}",
+                        text = typeLabelText,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -685,7 +698,6 @@ fun PostDetailBottomSheet(
                         )
                     }
 
-                    // Einheitlicher, fester Container für das Medium, damit nichts wegläuft
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -693,35 +705,31 @@ fun PostDetailBottomSheet(
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        val displayItems = remember(currentImages, post.mediaUrl, post.id) {
-                            val rawList = if (!currentImages.isNullOrEmpty()) {
-                                currentImages
-                            } else if (post.mediaUrl != null) {
-                                listOf(
-                                    ImgurImage(
-                                        id = post.id,
-                                        link = post.mediaUrl!!,
-                                        mp4 = if (post.isVideo) post.mediaUrl else null,
-                                        type = if (post.isVideo) "video/mp4" else "image/jpeg",
-                                        size = post.sizeInBytes
-                                    )
+                        val cachedImages = viewModel.albumImagesCache[post.id]
+                        val rawList = when {
+                            !cachedImages.isNullOrEmpty() -> cachedImages
+                            !post.images.isNullOrEmpty() -> post.images
+                            post.mediaUrl != null -> listOf(
+                                ImgurImage(
+                                    id = post.id,
+                                    link = post.mediaUrl!!,
+                                    mp4 = if (post.isVideo) post.mediaUrl else null,
+                                    type = if (post.isVideo) "video/mp4" else "image/jpeg",
+                                    size = post.sizeInBytes
                                 )
-                            } else {
-                                emptyList()
-                            }
+                            )
+                            else -> emptyList()
+                        }
 
-                            rawList.map { img ->
-                                val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
-                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
-                                img.copy(link = fixedLink, mp4 = fixedMp4)
-                            }
+                        val displayItems = rawList.map { img ->
+                            val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
+                            val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
+                            img.copy(link = fixedLink, mp4 = fixedMp4)
                         }
 
                         if (displayItems.isEmpty()) {
                             CircularProgressIndicator(modifier = Modifier.size(32.dp))
                         } else {
-                            // Wenn das Album mehrere Bilder hat, nutzen wir einen internen Pager,
-                            // anstatt alle untereinander zu quetschen. Das verhindert Layout-Kollapse.
                             val albumPagerState = rememberPagerState(pageCount = { displayItems.size })
 
                             HorizontalPager(
@@ -753,7 +761,6 @@ fun PostDetailBottomSheet(
                                 )
                             }
 
-                            // Indikator für mehrere Bilder im Album (optional, falls gewünscht, aber hier dezent)
                             if (displayItems.size > 1) {
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
