@@ -54,6 +54,13 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import androidx.compose.foundation.verticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.unit.Dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -183,7 +190,7 @@ fun ImgurFeedScreen(
                 columns = GridCells.Fixed(2),
                 state = gridState,
                 contentPadding = PaddingValues(8.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().verticalScrollbar(gridState)
             ) {
                 itemsIndexed(
                     items = viewModel.posts,
@@ -757,4 +764,53 @@ fun VideoPlayer(
 
         // Das unsichtbare Compose-Overlay von vorher haben wir komplett gelöscht!
     }
+}
+
+
+fun Modifier.verticalScrollbar(
+    state: LazyGridState,
+    thumbColor: Color = Color.Gray.copy(alpha = 0.5f),
+    thumbWidth: Dp = 4.dp
+): Modifier = this.drawWithContent {
+    drawContent()
+
+    val layoutInfo = state.layoutInfo
+    val totalItemsCount = layoutInfo.totalItemsCount
+    if (totalItemsCount == 0) return@drawWithContent
+
+    val visibleItems = layoutInfo.visibleItemsInfo
+    if (visibleItems.isEmpty()) return@drawWithContent
+
+    // Prüfen, ob Scrollen überhaupt notwendig ist
+    val firstVisibleItem = visibleItems.first()
+    val lastVisibleItem = visibleItems.last()
+
+    if (firstVisibleItem.index == 0 && lastVisibleItem.index >= totalItemsCount - 1) {
+        return@drawWithContent // Alles auf dem Bildschirm, kein Scrollbalken nötig
+    }
+
+    // Da ein Grid 2 Spalten hat, teilen wir die Gesamtreihenanzahl durch 2 (aufgerundet)
+    val totalRows = (totalItemsCount + 1) / 2
+    val visibleRows = (visibleItems.size + 1) / 2
+
+    val averageItemHeight = visibleItems.sumOf { it.size.height }.toFloat() / visibleItems.size
+    val totalEstimatedHeight = totalRows * averageItemHeight
+    val viewportHeight = size.height
+
+    if (totalEstimatedHeight <= viewportHeight) return@drawWithContent
+
+    // Scrollbalken-Größe und Position berechnen
+    val scrollOffset = firstVisibleItem.index.toFloat() / 2 * averageItemHeight - firstVisibleItem.offset.y
+    val scrollFraction = (scrollOffset / (totalEstimatedHeight - viewportHeight)).coerceIn(0f, 1f)
+
+    val scrollbarHeight = (viewportHeight * (viewportHeight / totalEstimatedHeight)).coerceAtLeast(40f)
+    val scrollbarY = scrollFraction * (viewportHeight - scrollbarHeight)
+    val scrollbarX = size.width - thumbWidth.toPx() - 2.dp.toPx()
+
+    drawRoundRect(
+        color = thumbColor,
+        topLeft = Offset(scrollbarX, scrollbarY),
+        size = Size(thumbWidth.toPx(), scrollbarHeight),
+        cornerRadius = CornerRadius(thumbWidth.toPx() / 2, thumbWidth.toPx() / 2)
+    )
 }
