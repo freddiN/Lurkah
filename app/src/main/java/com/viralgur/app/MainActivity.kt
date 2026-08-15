@@ -1,6 +1,7 @@
 @file:OptIn(
     androidx.compose.foundation.ExperimentalFoundationApi::class,
-    androidx.compose.material3.ExperimentalMaterial3Api::class
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.media3.common.util.UnstableApi::class
 )
 
 package com.viralgur.app
@@ -58,7 +59,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val isDarkMode by mainViewModel.isDarkMode.collectAsState()
-            val autoReplay by mainViewModel.autoPlayVideos.collectAsState() // Korrigiert auf tatsächlichen State im ViewModel
+            val autoReplay by mainViewModel.autoPlayVideos.collectAsState()
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
@@ -92,7 +93,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             autoReplay = autoReplay,
             blacklistedUsers = blacklistedUsers,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
-            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) }, // Korrigiert auf ViewModel-Funktion
+            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) },
             onAddBlacklistUser = { viewModel.addBlacklistUser(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             modifier = Modifier.systemBarsPadding()
@@ -670,7 +671,6 @@ fun VideoPlayer(
                     player = exoPlayer
                     useController = showControls
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    // Offizieller Workaround von Media3 für Compose gegen das Aufblitzen beim Schließen
                     setEnableComposeSurfaceSyncWorkaround(true)
                 }
             },
