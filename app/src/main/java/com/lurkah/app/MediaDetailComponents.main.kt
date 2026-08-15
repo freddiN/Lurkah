@@ -50,7 +50,6 @@ fun PostDetailBottomSheet(
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             viewModel.loadCommentsForPost(post.id)
-            // Lade die restlichen Album-Bilder nach, falls das Album größer ist
             viewModel.loadFullAlbumDetails(post.id, pagerState.currentPage)
         }
     }
@@ -63,7 +62,6 @@ fun PostDetailBottomSheet(
                 .background(MaterialTheme.colorScheme.surface)
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
-            // Prüfen, ob diese Seite gerade wirklich aktiv (sichtbar) ist
             val isCurrentPage = pagerState.currentPage == page
 
             LazyColumn(
@@ -119,53 +117,49 @@ fun PostDetailBottomSheet(
                         )
                     }
 
-                    Box(
+                    // Fester Container, der verhindert, dass die LazyColumn das Layout beim Laden kollabieren lässt
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .wrapContentHeight()
+                            .wrapContentHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val imgurImages = post.images
 
                         if (!imgurImages.isNullOrEmpty()) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                imgurImages.forEachIndexed { imgIndex, img ->
-                                    val itemUrl = img.mp4 ?: img.link
-                                    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+                            imgurImages.forEachIndexed { imgIndex, img ->
+                                val itemUrl = img.mp4 ?: img.link
+                                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
 
-                                    if (isItemVideo && itemUrl != null) {
-                                        // Video spielt nur ab, wenn es in der aktuellen Page ist UND die Seite aktiv ist
-                                        VideoPlayer(
-                                            videoUrl = itemUrl,
-                                            isMuted = false,
-                                            autoReplay = autoReplay,
-                                            autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                            showControls = true,
-                                            onDoubleClick = { onDoubleClick(page) },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(max = 350.dp)
-                                        )
-                                    } else if (itemUrl != null) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current)
-                                                .data(itemUrl)
-                                                .crossfade(true)
-                                                .build(),
-                                            contentDescription = "${post.title} - ${imgIndex + 1}",
-                                            contentScale = ContentScale.Fit,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(min = 250.dp, max = 350.dp) // WICHTIG: min-height verhindert das Zusammenfallen
-                                                .pointerInput(Unit) {
-                                                    detectTapGestures(
-                                                        onDoubleTap = { onDoubleClick(page) }
-                                                    )
-                                                }
-                                        )
-                                    }
+                                if (isItemVideo && itemUrl != null) {
+                                    VideoPlayer(
+                                        videoUrl = itemUrl,
+                                        isMuted = false,
+                                        autoReplay = autoReplay,
+                                        autoPlayVideos = autoPlayVideos && isCurrentPage,
+                                        showControls = true,
+                                        onDoubleClick = { onDoubleClick(page) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 250.dp, max = 350.dp)
+                                    )
+                                } else if (itemUrl != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(itemUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "${post.title} - ${imgIndex + 1}",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 250.dp, max = 350.dp)
+                                            .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onDoubleTap = { onDoubleClick(page) }
+                                                )
+                                            }
+                                    )
                                 }
                             }
                         } else if (post.isVideo && post.mediaUrl != null) {
@@ -178,11 +172,14 @@ fun PostDetailBottomSheet(
                                 onDoubleClick = { onDoubleClick(page) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 350.dp)
+                                    .heightIn(min = 250.dp, max = 350.dp)
                             )
                         } else if (post.mediaUrl != null) {
                             AsyncImage(
-                                model = post.mediaUrl,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(post.mediaUrl)
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = post.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
@@ -236,14 +233,9 @@ fun PostDetailBottomSheet(
                         comment = comment,
                         depth = 0,
                         onImageReferenceClick = { targetIndex ->
-                            // Optional: Sicherstellen, dass der Index im Rahmen der verfügbaren Bilder liegt
                             val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
                             val maxImages = currentPost?.images?.size ?: 1
                             val safeIndex = targetIndex.coerceIn(0, maxImages - 1)
-
-                            // Hier öffnen wir den FullScreenViewer für das Album (oder den Post)
-                            // Da das BottomSheet den aktuellen Post-Index nutzt, übergeben wir den pagerState.currentPage
-                            // und müssen dem Vollbild-Viewer mitteilen, welches Bild im Album gemeint ist.
                         }
                     )
                 }
