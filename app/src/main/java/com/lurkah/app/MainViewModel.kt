@@ -53,8 +53,10 @@ data class ImgurPost(
     // FIX: Verbesserte Dateigrößen-Ermittlung (durchsucht alle Bilder/Videos im Post nach einem gültigen Wert)
     val sizeInBytes: Long
         get() {
-            if (mainMedia?.size != null && mainMedia.size > 0L) {
-                return mainMedia.size
+            // Lokale Variable erzwingt das Smart Casting in Kotlin
+            val media = mainMedia
+            if (media?.size != null && media.size > 0L) {
+                return media.size
             }
             images?.forEach { img ->
                 if (img.size != null && img.size > 0L) {
