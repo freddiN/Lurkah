@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val isDarkMode by mainViewModel.isDarkMode.collectAsState()
-            val autoReplay by mainViewModel.autoPlayVideos.collectAsState()
+            val autoReplay by mainViewModel.autoReplay.collectAsState()
             val colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
             MaterialTheme(colorScheme = colorScheme) {
@@ -238,7 +238,7 @@ fun ImgurFeedScreen(
                     autoReplay = autoReplay,
                     onDismiss = { selectedPostIndex = null },
                     onDoubleClick = { index ->
-                        selectedPostIndex = null // <-- NEU: Schließt das Bottom-Sheet
+                        selectedPostIndex = null
                         fullScreenPostIndex = index
                     }
                 )
@@ -537,6 +537,7 @@ fun PostDetailBottomSheet(
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { viewModel.posts.size })
+    val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
@@ -707,7 +708,7 @@ fun VideoPlayer(
         }
     }
 
-    DisposableEffect(videoUrl, autoReplay) {
+    DisposableEffect(videoUrl, autoReplay, autoPlayVideos) {
         onDispose {
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
