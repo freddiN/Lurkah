@@ -69,4 +69,10 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.3.1")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    implementation("me.saket.telephoto:zoomable-image-coil:0.19.0")
+
+    // Media3 ExoPlayer & Compose Material3 UI
+    implementation("androidx.media3:media3-exoplayer:1.11.0")
+    implementation("androidx.media3:media3-ui-compose-material3:1.11.0")
 }

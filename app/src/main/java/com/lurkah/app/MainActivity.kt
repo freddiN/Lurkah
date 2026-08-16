@@ -6,10 +6,7 @@
 
 package com.lurkah.app
 
-import android.net.Uri
 import android.os.Bundle
-import android.view.GestureDetector
-import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -18,7 +15,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -26,7 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +38,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -51,19 +46,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import androidx.compose.foundation.lazy.itemsIndexed
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -403,9 +391,6 @@ fun FullScreenFeedViewer(
         onDismiss()
     }
 
-    // NEU: Hält fest, ob gerade gezoomt wird, um das Scrollen zu blockieren
-    var isZoomed by remember { mutableStateOf(false) }
-
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
         pageCount = { viewModel.posts.size }
@@ -437,7 +422,6 @@ fun FullScreenFeedViewer(
             HorizontalPager(
                 state = pagerState,
                 beyondBoundsPageCount = 1,
-                userScrollEnabled = !isZoomed, // GEFIXT: Pager-Swipe deaktivieren, wenn gezoomt
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
@@ -477,7 +461,7 @@ fun FullScreenFeedViewer(
                     val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
 
                     if (isItemVideo) {
-                        DetailMediaItem(
+                        ComposeVideoPlayer(
                             url = itemUrl,
                             isCurrentPage = isCurrentPage,
                             isFirstItem = true,
@@ -486,18 +470,16 @@ fun FullScreenFeedViewer(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        ZoomableImage(
+                        ZoomableMediaViewer(
                             url = itemUrl,
                             contentDesc = post.title,
                             isFullScreen = true,
-                            onZoomChange = { isZoomed = it }, // NEU: Übergibt Zoom-Status
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        userScrollEnabled = !isZoomed, // GEFIXT: Listen-Scroll deaktivieren, wenn gezoomt
                         contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp)
                     ) {
                         item {
@@ -514,10 +496,10 @@ fun FullScreenFeedViewer(
                             val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
 
                             if (isItemVideo) {
-                                DetailMediaItem(
+                                ComposeVideoPlayer(
                                     url = itemUrl,
                                     isCurrentPage = isCurrentPage,
-                                    isFirstItem = index == 0, // GEFIXT: Nur erstes Video spielt automatisch
+                                    isFirstItem = index == 0,
                                     autoReplay = autoReplay,
                                     autoPlayVideos = autoPlayVideos,
                                     modifier = Modifier
@@ -526,11 +508,10 @@ fun FullScreenFeedViewer(
                                         .padding(vertical = 8.dp)
                                 )
                             } else {
-                                ZoomableImage(
+                                ZoomableMediaViewer(
                                     url = if (itemUrl.endsWith(".gifv")) itemUrl.removeSuffix(".gifv") + ".jpg" else itemUrl,
                                     contentDesc = post.title,
                                     isFullScreen = false,
-                                    onZoomChange = { isZoomed = it }, // NEU
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 8.dp)
@@ -551,135 +532,5 @@ fun FullScreenFeedViewer(
                 Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
-    }
-}
-
-@Composable
-fun ZoomableImage(
-    url: String,
-    contentDesc: String,
-    isFullScreen: Boolean = false,
-    onZoomChange: ((Boolean) -> Unit)? = null, // NEU: Callback für Zoom-Status
-    modifier: Modifier = Modifier
-) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-
-    // NEU: Informiert die Ebene darüber, wenn rein- oder rausgezoomt wird
-    LaunchedEffect(scale) {
-        onZoomChange?.invoke(scale > 1f)
-    }
-
-    val baseModifier = if (isFullScreen) {
-        modifier.fillMaxSize()
-    } else {
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 350.dp) // GEFIXT: Verhindert das Kollabieren von Bildern im Album
-    }
-
-    Box(
-        modifier = baseModifier
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = scale * zoom
-                    if (newScale > 1.05f || scale > 1f) {
-                        scale = newScale.coerceIn(1f, 5f)
-                        offsetX += pan.x
-                        offsetY += pan.y
-                    } else {
-                        scale = 1f
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
-                }
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(url)
-                .crossfade(true)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .memoryCachePolicy(CachePolicy.ENABLED)
-                .build(),
-            contentDescription = contentDesc,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY
-                )
-        )
-    }
-}
-
-@Composable
-fun DetailMediaItem(
-    url: String,
-    isCurrentPage: Boolean,
-    isFirstItem: Boolean = true, // NEU: Bestimmt, ob es als erstes Album-Item sofort abspielen darf
-    autoReplay: Boolean,
-    autoPlayVideos: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-
-    val exoPlayer = remember(url, context) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(url)))
-            prepare()
-        }
-    }
-
-    // GEFIXT: Logik für Album-Videos
-    LaunchedEffect(autoReplay, autoPlayVideos, isCurrentPage, isFirstItem) {
-        exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-
-        if (!isCurrentPage) {
-            exoPlayer.pause()
-        } else if (autoPlayVideos && isFirstItem) {
-            exoPlayer.playWhenReady = true
-        }
-    }
-
-    DisposableEffect(url) {
-        onDispose {
-            exoPlayer.pause()
-            exoPlayer.stop()
-            exoPlayer.release()
-        }
-    }
-
-    Box(
-        modifier = modifier.background(Color.Black),
-        contentAlignment = Alignment.Center
-    ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = true
-                    controllerAutoShow = false
-                    controllerShowTimeoutMs = 2500
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    hideController()
-                    // GEFIXT: Der kaputte GestureDetector wurde hier komplett entfernt.
-                    // ExoPlayer verarbeitet einfache Klicks jetzt wieder fehlerfrei nativ.
-                }
-            },
-            update = { playerView ->
-                if (playerView.player != exoPlayer) {
-                    playerView.player = exoPlayer
-                    playerView.hideController()
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
     }
 }
