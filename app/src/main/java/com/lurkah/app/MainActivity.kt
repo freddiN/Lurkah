@@ -739,26 +739,59 @@ fun PostDetailBottomSheet(
                                 val img = displayItems[albumPageIndex]
                                 val shouldPlayVideo = isCurrentPage && albumPagerState.currentPage == albumPageIndex
 
-                                DetailMediaItem(
-                                    img = img,
-                                    imgIndex = albumPageIndex,
-                                    post = post,
-                                    isCurrentPage = shouldPlayVideo,
-                                    autoReplay = autoReplay,
-                                    autoPlayVideos = autoPlayVideos,
-                                    onDoubleClick = { currentPos ->
-                                        onDoubleClick(page, currentPos)
-                                    },
-                                    onPlayerReady = { player ->
-                                        if (player != null) {
-                                            if (!shouldPlayVideo) {
-                                                player.playWhenReady = false
-                                            } else {
-                                                activePlayer = player
+                                val isReallyVideo = img.isVideo || img.mp4 != null || img.link.endsWith(".mp4") || img.link.endsWith(".gifv")
+
+                                if (!isReallyVideo) {
+                                    val imageUrl = if (img.link.endsWith(".gifv")) {
+                                        img.link.removeSuffix(".gifv") + ".jpg"
+                                    } else {
+                                        img.link
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onDoubleTap = { onDoubleClick(page, albumPageIndex.toLong()) }
+                                                )
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(imageUrl)
+                                                .crossfade(true)
+                                                .diskCachePolicy(CachePolicy.ENABLED)
+                                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                                .build(),
+                                            contentDescription = post.title,
+                                            contentScale = ContentScale.Fit,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                } else {
+                                    DetailMediaItem(
+                                        img = img,
+                                        imgIndex = albumPageIndex,
+                                        post = post,
+                                        isCurrentPage = shouldPlayVideo,
+                                        autoReplay = autoReplay,
+                                        autoPlayVideos = autoPlayVideos,
+                                        onDoubleClick = { currentPos ->
+                                            onDoubleClick(page, currentPos)
+                                        },
+                                        onPlayerReady = { player ->
+                                            if (player != null) {
+                                                if (!shouldPlayVideo) {
+                                                    player.playWhenReady = false
+                                                } else {
+                                                    activePlayer = player
+                                                }
                                             }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
 
                             if (displayItems.size > 1) {
