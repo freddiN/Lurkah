@@ -417,19 +417,43 @@ fun SmartMediaCard(
 
 @Composable
 fun FullScreenMediaViewer(
-    initialIndex: Int,
-    posts: List<ImgurPost>,
+    initialIndex: Int, // Das ist jetzt der gewählte Album-Index!
+    post: ImgurPost,
     autoReplay: Boolean,
     initialPlaybackPosition: Long = 0L,
     viewModel: MainViewModel,
-    onDismiss: (Int) -> Unit
+    onDismiss: () -> Unit
 ) {
-    val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
-    val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
+    val cachedImages = viewModel.albumImagesCache[post.id]
+    val displayItems = remember(cachedImages, post.images, post.mediaUrl) {
+        val rawList = when {
+            !cachedImages.isNullOrEmpty() -> cachedImages
+            !post.images.isNullOrEmpty() -> post.images
+            post.mediaUrl != null -> listOf(
+                ImgurImage(
+                    id = post.id,
+                    link = post.mediaUrl!!,
+                    mp4 = if (post.isVideo) post.mediaUrl else null,
+                    type = if (post.isVideo) "video/mp4" else "image/jpeg",
+                    size = post.sizeInBytes
+                )
+            )
+            else -> emptyList()
+        }
+
+        rawList.map { img ->
+            val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".jpg" else img.link
+            val fixedMp4 = img.mp4 ?: if (img.link.endsWith(".mp4")) img.link else null
+            img.copy(link = fixedLink, mp4 = fixedMp4)
+        }
+    }
+
+    val safeInitialPage = initialIndex.coerceIn(0, (displayItems.size - 1).coerceAtLeast(0))
+    val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { displayItems.size })
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
     Dialog(
-        onDismissRequest = { onDismiss(pagerState.currentPage) },
+        onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
@@ -439,29 +463,34 @@ fun FullScreenMediaViewer(
         ) {
             HorizontalPager(
                 state = pagerState,
+                beyondBoundsPageCount = 1,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                val post = posts.getOrNull(page) ?: return@HorizontalPager
+                val img = displayItems.getOrNull(page) ?: return@HorizontalPager
                 val isCurrentPage = pagerState.currentPage == page
-
-                val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
 
                 var scale by remember { mutableFloatStateOf(1f) }
                 var offsetX by remember { mutableFloatStateOf(0f) }
                 var offsetY by remember { mutableFloatStateOf(0f) }
 
+                val itemUrl = img.mp4 ?: img.link
+                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                scale = (scale * zoom).coerceIn(1f, 5f)
-                                if (scale > 1f) {
-                                    offsetX += pan.x
-                                    offsetY += pan.y
-                                } else {
-                                    offsetX = 0f
-                                    offsetY = 0f
+                        .pointerInput(scale) {
+                            if (scale > 1f) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    scale = (scale * zoom).coerceIn(1f, 5f)
+                                    if (scale > 1f) {
+                                        offsetX += pan.x
+                                        offsetY += pan.y
+                                    } else {
+                                        scale = 1f
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    }
                                 }
                             }
                         }
@@ -477,78 +506,50 @@ fun FullScreenMediaViewer(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        val displayItems = remember(currentImages, post.mediaUrl) {
-                            val rawList = if (!currentImages.isNullOrEmpty()) {
-                                currentImages
-                            } else if (post.mediaUrl != null) {
-                                listOf(
-                                    ImgurImage(
-                                        id = post.id,
-                                        link = post.mediaUrl!!,
-                                        mp4 = if (post.isVideo) post.mediaUrl else null,
-                                        type = if (post.isVideo) "video/mp4" else "image/jpeg",
-                                        size = post.sizeInBytes
-                                    )
-                                )
-                            } else {
-                                emptyList()
-                            }
-
-                            rawList.map { img ->
-                                val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
-                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
-                                img.copy(link = fixedLink, mp4 = fixedMp4)
-                            }
-                        }
-
-                        if (displayItems.isNotEmpty()) {
-                            val firstImg = displayItems.first()
-                            val itemUrl = firstImg.mp4 ?: firstImg.link
-                            val isItemVideo = (firstImg.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
-
-                            if (isItemVideo) {
-                                VideoPlayer(
-                                    videoUrl = itemUrl,
-                                    isMuted = false,
-                                    autoReplay = autoReplay,
-                                    autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                    showControls = true,
-                                    startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(itemUrl)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .memoryCachePolicy(CachePolicy.ENABLED)
-                                        .build(),
-                                    contentDescription = post.title,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .pointerInput(Unit) {
-                                            detectTapGestures(
-                                                onDoubleTap = {
-                                                    if (scale > 1f) {
-                                                        scale = 1f
-                                                        offsetX = 0f
-                                                        offsetY = 0f
-                                                    } else {
-                                                        scale = 2.5f
-                                                    }
+                        if (isItemVideo) {
+                            VideoPlayer(
+                                videoUrl = itemUrl,
+                                isMuted = false,
+                                autoReplay = autoReplay,
+                                autoPlayVideos = autoPlayVideos && isCurrentPage,
+                                showControls = true,
+                                startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(itemUrl)
+                                    .crossfade(true)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .build(),
+                                contentDescription = post.title,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onDoubleTap = {
+                                                if (scale > 1f) {
+                                                    scale = 1f
+                                                    offsetX = 0f
+                                                    offsetY = 0f
+                                                } else {
+                                                    scale = 2.5f
                                                 }
-                                            )
-                                        }
-                                )
-                            }
+                                            }
+                                        )
+                                    }
+                            )
                         }
                     }
                 }
             }
 
+            // Close Button
             IconButton(
-                onClick = { onDismiss(pagerState.currentPage) },
+                onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(24.dp)
@@ -704,7 +705,8 @@ fun PostDetailBottomSheet(
                                             .pointerInput(Unit) {
                                                 detectTapGestures(
                                                     onDoubleTap = {
-                                                        onDoubleClick(page, 0L)
+                                                        // Übertägt den exakten Index des Bildes im Album
+                                                        onDoubleClick(albumPageIndex, 0L)
                                                     }
                                                 )
                                             },
@@ -732,7 +734,9 @@ fun PostDetailBottomSheet(
                                         autoReplay = autoReplay,
                                         autoPlayVideos = autoPlayVideos,
                                         onDoubleClick = { currentPos ->
-                                            onDoubleClick(page, currentPos)
+                                            // Stoppt den Player sofort, um doppeltes Audio zu vermeiden
+                                            activePlayer?.playWhenReady = false
+                                            onDoubleClick(albumPageIndex, currentPos)
                                         },
                                         onPlayerReady = { player ->
                                             if (player != null) {
@@ -805,86 +809,6 @@ fun PostDetailBottomSheet(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun VideoPlayer(
-    videoUrl: String,
-    isMuted: Boolean,
-    autoReplay: Boolean,
-    autoPlayVideos: Boolean,
-    modifier: Modifier = Modifier,
-    showControls: Boolean = false,
-    startPositionMs: Long = 0L,
-    onDoubleClick: (() -> Unit)? = null
-) {
-    val context = LocalContext.current
-
-    val exoPlayer = remember(videoUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
-            if (startPositionMs > 0L) {
-                seekTo(startPositionMs)
-            }
-            prepare()
-        }
-    }
-
-    LaunchedEffect(autoReplay, autoPlayVideos, isMuted) {
-        exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-        exoPlayer.volume = if (isMuted) 0f else 1f
-        exoPlayer.playWhenReady = autoPlayVideos && showControls || autoPlayVideos
-    }
-
-    DisposableEffect(videoUrl, isMuted) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
-    Box(modifier = modifier.background(Color.Black)) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = true
-                    controllerAutoShow = false
-                    controllerShowTimeoutMs = 2500
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-
-                    val gestureDetector = android.view.GestureDetector(
-                        ctx,
-                        object : android.view.GestureDetector.SimpleOnGestureListener() {
-                            override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
-                                if (isControllerFullyVisible) {
-                                    hideController()
-                                } else {
-                                    showController()
-                                }
-                                return true
-                            }
-
-                            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
-                                onDoubleClick?.invoke()
-                                return true
-                            }
-                        }
-                    )
-                    setOnTouchListener { _, event ->
-                        gestureDetector.onTouchEvent(event)
-                        true
-                    }
-                }
-            },
-            update = { playerView ->
-                if (playerView.player != exoPlayer) {
-                    playerView.player = exoPlayer
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
     }
 }
 
