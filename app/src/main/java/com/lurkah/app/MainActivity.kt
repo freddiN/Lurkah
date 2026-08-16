@@ -162,6 +162,7 @@ fun ImgurFeedScreen(
 ) {
     var selectedPostIndex by remember { mutableStateOf<Int?>(null) }
     var fullScreenPostIndex by remember { mutableStateOf<Int?>(null) }
+    var selectedAlbumIndex by remember { mutableIntStateOf(0) }
     var userToBlock by remember { mutableStateOf<String?>(null) }
     var lastVideoPosition by remember { mutableLongStateOf(0L) }
 
@@ -246,6 +247,7 @@ fun ImgurFeedScreen(
                         onClick = { selectedPostIndex = index },
                         onDoubleClick = {
                             lastVideoPosition = 0L
+                            selectedAlbumIndex = 0
                             fullScreenPostIndex = index
                         },
                         onAccountClick = { author -> userToBlock = author }
@@ -294,25 +296,27 @@ fun ImgurFeedScreen(
                     viewModel = viewModel,
                     autoReplay = autoReplay,
                     onDismiss = { selectedPostIndex = null },
-                    onDoubleClick = { index, position ->
+                    onDoubleClick = { albumIndex, position ->
                         lastVideoPosition = position
-                        fullScreenPostIndex = index
+                        selectedAlbumIndex = albumIndex
+                        fullScreenPostIndex = initialIndex
                     }
                 )
             }
 
-            fullScreenPostIndex?.let { initialIndex ->
-                FullScreenMediaViewer(
-                    initialIndex = initialIndex,
-                    posts = viewModel.posts,
-                    autoReplay = autoReplay,
-                    initialPlaybackPosition = lastVideoPosition,
-                    viewModel = viewModel,
-                    onDismiss = { index ->
-                        fullScreenPostIndex = null
-                        selectedPostIndex = index
-                    }
-                )
+            fullScreenPostIndex?.let { postIndex ->
+                val currentPost = viewModel.posts.getOrNull(postIndex)
+                currentPost?.let { post ->
+                    FullScreenMediaViewer(
+                        initialIndex = selectedAlbumIndex,
+                        post = post,
+                        autoReplay = autoReplay,
+                        viewModel = viewModel,
+                        onDismiss = {
+                            fullScreenPostIndex = null
+                        }
+                    )
+                }
             }
         }
     }
@@ -417,10 +421,9 @@ fun SmartMediaCard(
 
 @Composable
 fun FullScreenMediaViewer(
-    initialIndex: Int, // Das ist jetzt der gewählte Album-Index!
+    initialIndex: Int,
     post: ImgurPost,
     autoReplay: Boolean,
-    initialPlaybackPosition: Long = 0L,
     viewModel: MainViewModel,
     onDismiss: () -> Unit
 ) {
@@ -474,7 +477,7 @@ fun FullScreenMediaViewer(
                 var offsetY by remember { mutableFloatStateOf(0f) }
 
                 val itemUrl = img.mp4 ?: img.link
-                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
+                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
 
                 Box(
                     modifier = Modifier
@@ -507,14 +510,15 @@ fun FullScreenMediaViewer(
                         contentAlignment = Alignment.Center
                     ) {
                         if (isItemVideo) {
-                            VideoPlayer(
-                                videoUrl = itemUrl,
-                                isMuted = false,
+                            DetailMediaItem(
+                                img = img,
+                                imgIndex = page,
+                                post = post,
+                                isCurrentPage = isCurrentPage,
                                 autoReplay = autoReplay,
-                                autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                showControls = true,
-                                startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L,
-                                modifier = Modifier.fillMaxSize()
+                                autoPlayVideos = autoPlayVideos,
+                                onDoubleClick = { },
+                                onPlayerReady = { }
                             )
                         } else {
                             AsyncImage(
@@ -547,7 +551,6 @@ fun FullScreenMediaViewer(
                 }
             }
 
-            // Close Button
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
@@ -705,7 +708,6 @@ fun PostDetailBottomSheet(
                                             .pointerInput(Unit) {
                                                 detectTapGestures(
                                                     onDoubleTap = {
-                                                        // Übertägt den exakten Index des Bildes im Album
                                                         onDoubleClick(albumPageIndex, 0L)
                                                     }
                                                 )
@@ -734,7 +736,6 @@ fun PostDetailBottomSheet(
                                         autoReplay = autoReplay,
                                         autoPlayVideos = autoPlayVideos,
                                         onDoubleClick = { currentPos ->
-                                            // Stoppt den Player sofort, um doppeltes Audio zu vermeiden
                                             activePlayer?.playWhenReady = false
                                             onDoubleClick(albumPageIndex, currentPos)
                                         },
@@ -872,7 +873,6 @@ fun DetailMediaItem(
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
-                        // Erzwingt das Ausblenden beim Initialisieren
                         hideController()
 
                         val gestureDetector = android.view.GestureDetector(
