@@ -17,12 +17,14 @@ fun ZoomableMediaViewer(
     isFullScreen: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    // FIX: Für Listen (isFullScreen = false) wird zusätzlich eine maximale Höhe 'max' definiert,
+    // damit LazyColumn nicht Constraints.Infinity an Telephoto weiterreicht.
     val baseModifier = if (isFullScreen) {
         modifier.fillMaxSize()
     } else {
         modifier
             .fillMaxWidth()
-            .heightIn(min = 350.dp)
+            .heightIn(min = 300.dp, max = 600.dp)
     }
 
     ZoomableAsyncImage(
