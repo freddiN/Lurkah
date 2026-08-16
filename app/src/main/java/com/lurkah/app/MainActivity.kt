@@ -690,8 +690,38 @@ fun PostDetailBottomSheet(
                                         img.link
                                     }
 
+                                    var scale by remember { mutableFloatStateOf(1f) }
+                                    var offsetX by remember { mutableFloatStateOf(0f) }
+                                    var offsetY by remember { mutableFloatStateOf(0f) }
+
                                     Box(
-                                        modifier = Modifier.fillMaxSize(),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .pointerInput(Unit) {
+                                                detectTransformGestures { _, pan, zoom, _ ->
+                                                    scale = (scale * zoom).coerceIn(1f, 5f)
+                                                    if (scale > 1f) {
+                                                        offsetX += pan.x
+                                                        offsetY += pan.y
+                                                    } else {
+                                                        offsetX = 0f
+                                                        offsetY = 0f
+                                                    }
+                                                }
+                                            }
+                                            .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onDoubleTap = {
+                                                        if (scale > 1f) {
+                                                            scale = 1f
+                                                            offsetX = 0f
+                                                            offsetY = 0f
+                                                        } else {
+                                                            scale = 2.5f
+                                                        }
+                                                    }
+                                                )
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         AsyncImage(
@@ -703,7 +733,14 @@ fun PostDetailBottomSheet(
                                                 .build(),
                                             contentDescription = post.title,
                                             contentScale = ContentScale.Fit,
-                                            modifier = Modifier.fillMaxSize()
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .graphicsLayer(
+                                                    scaleX = scale,
+                                                    scaleY = scale,
+                                                    translationX = offsetX,
+                                                    translationY = offsetY
+                                                )
                                         )
                                     }
                                 } else {
@@ -836,6 +873,8 @@ fun VideoPlayer(
                     controllerShowTimeoutMs = 2500
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+
+                    hideController()
 
                     val gestureDetector = android.view.GestureDetector(
                         ctx,
