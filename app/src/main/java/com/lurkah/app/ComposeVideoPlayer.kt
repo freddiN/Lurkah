@@ -13,7 +13,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.material3.Player as Media3Player
 
 @Composable
-parser fun ComposeVideoPlayer(
+fun ComposeVideoPlayer(
     url: String,
     isCurrentPage: Boolean,
     isFirstItem: Boolean = true,
@@ -47,7 +47,6 @@ parser fun ComposeVideoPlayer(
         }
     }
 
-    // Nutzt das native Media3 Material3 Compose Composable
     Media3Player(
         player = exoPlayer,
         modifier = modifier
