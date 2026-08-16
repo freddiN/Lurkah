@@ -232,19 +232,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadFullAlbumDetails(postId: String, post: ImgurPost? = null) {
-        if (albumImagesCache.containsKey(postId)) return
+        val totalCount = post?.imagesCount ?: post?.images?.size ?: 0
+        val cachedCount = albumImagesCache[postId]?.size ?: 0
 
-        // 1. Wenn der Post im Feed bereits Bilder mitbringt, direkt cachen
-        if (!post?.images.isNullOrEmpty()) {
-            albumImagesCache[postId] = post!!.images!!
+        // Wenn bereits alle Bilder im Cache liegen, kein Re-Fetch nötig
+        if (albumImagesCache.containsKey(postId) && cachedCount >= totalCount && totalCount > 0) {
             return
         }
 
-        // 2. Ansonsten über den Gallery-Endpunkt nachladen
         viewModelScope.launch {
             try {
-                val response = api.getGalleryItem(authHeader = clientId, galleryId = postId)
-                if (!response.data.images.isNullOrEmpty()) {
+                // Ruft den echten Album-Endpunkt (3/album/{id}) auf, der ALLE Bilder liefert
+                val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
+                if (response.success && !response.data.images.isNullOrEmpty()) {
                     albumImagesCache[postId] = response.data.images!!
                 }
             } catch (e: Exception) {
