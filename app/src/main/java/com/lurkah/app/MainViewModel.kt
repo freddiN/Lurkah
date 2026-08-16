@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
@@ -20,8 +21,6 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
 import java.util.Locale
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 
 // --- DATA MODELS ---
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
@@ -111,7 +110,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val clientId = "Client-ID 546c25a59c58ad7"
     private val settingsManager = SettingsManager(application)
 
-    // Retrofit Setup
     private val retrofit = Retrofit.Builder()
         .baseUrl("https://api.imgur.com/")
         .addConverterFactory(GsonConverterFactory.create())
@@ -119,7 +117,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val api: ImgurApiService = retrofit.create(ImgurApiService::class.java)
 
-    // Exposed Settings Flows
     val isDarkMode: StateFlow<Boolean> = settingsManager.isDarkMode
         .stateIn(viewModelScope, SharingStarted.Lazily, true)
 
@@ -135,7 +132,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val blacklistedTags: StateFlow<Set<String>> = settingsManager.blacklistedTags
         .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
 
-    // UI States
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
@@ -156,36 +152,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val albumImagesCache = mutableStateMapOf<String, List<ImgurImage>>()
 
     init {
+        // FIX: Reagiert auf die DataStore-Flows und übernimmt auch das initiale Laden beim Start
         viewModelScope.launch {
-            // Kombiniert beide Flows und überspringt den initialen State beim Start (.drop(1)),
-            // damit beim App-Start nicht sofort doppelte Refreshes getriggert werden.
             combine(blacklistedUsers, blacklistedTags) { users, tags ->
                 Pair(users, tags)
-            }.drop(1).collect {
+            }.collect {
                 loadViralPosts(isRefresh = true)
             }
         }
-
-        // Initiales Laden der Posts beim Start der App
-        loadViralPosts(isRefresh = true)
     }
 
     fun loadViralPosts(isRefresh: Boolean = false) {
-        // Blockiert Nachladen, wenn schon geladen wird, ODER mehrfache Refreshes
         if (isLoadingMore && !isRefresh) return
         if (isRefresh && isRefreshing) return
 
-        viewModelScope.launch {
-            if (isRefresh) {
-                isRefreshing = true
-                currentPage = 0
-                posts.clear() // WICHTIG: Sofort leeren, bevor der API Call startet!
-            } else {
-                isLoadingMore = true
-            }
+        // FIX: Synchrones Setzen der Flags verhindert Race Conditions
+        if (isRefresh) {
+            isRefreshing = true
+        } else {
+            isLoadingMore = true
+        }
 
+        viewModelScope.launch {
             try {
-                val response = api.getMostViral(authHeader = clientId, page = currentPage)
+                val pageToLoad = if (isRefresh) 0 else currentPage
+                val response = api.getMostViral(authHeader = clientId, page = pageToLoad)
+
                 if (response.success) {
                     val currentBlacklist = blacklistedUsers.value.map { it.lowercase() }
                     val currentBlacklistTags = blacklistedTags.value.map { it.lowercase() }
@@ -195,6 +187,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val hasBlockedTag = post.tags.any { currentBlacklistTags.contains(it.lowercase()) }
 
                         !currentBlacklist.contains(author) && !hasBlockedTag && post.mediaUrl != null
+                    }
+
+                    // FIX: Liste erst nach erfolgreichem Fetch leeren (Kein Datenverlust bei Fehlern)
+                    if (isRefresh) {
+                        posts.clear()
+                        currentPage = 0
                     }
 
                     val existingIds = posts.map { it.id }.toSet()

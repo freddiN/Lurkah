@@ -58,8 +58,9 @@ class SettingsManager(private val context: Context) {
         }
     }
 
+    // FIX: Normalisierung auf lowercase schützt vor doppelten Einträgen
     suspend fun addBlacklistedUser(user: String) {
-        val cleanUser = user.trim().removePrefix("@")
+        val cleanUser = user.trim().removePrefix("@").lowercase()
         if (cleanUser.isBlank()) return
         context.dataStore.edit { preferences ->
             val current = preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
@@ -68,15 +69,15 @@ class SettingsManager(private val context: Context) {
     }
 
     suspend fun removeBlacklistedUser(user: String) {
+        val cleanUser = user.trim().removePrefix("@").lowercase()
         context.dataStore.edit { preferences ->
             val current = preferences[BLACKLISTED_USERS_KEY] ?: emptySet()
-            preferences[BLACKLISTED_USERS_KEY] = current - user
+            preferences[BLACKLISTED_USERS_KEY] = current - cleanUser
         }
     }
 
-    // NEU: Schritt 3 - Einen Tag hinzufügen
     suspend fun addBlacklistedTag(tag: String) {
-        val cleanTag = tag.trim().removePrefix("#") // Entfernt sicherheitshalber ein #
+        val cleanTag = tag.trim().removePrefix("#").lowercase()
         if (cleanTag.isBlank()) return
         context.dataStore.edit { preferences ->
             val current = preferences[BLACKLISTED_TAGS_KEY] ?: emptySet()
@@ -84,11 +85,11 @@ class SettingsManager(private val context: Context) {
         }
     }
 
-    // NEU: Schritt 4 - Einen Tag entfernen
     suspend fun removeBlacklistedTag(tag: String) {
+        val cleanTag = tag.trim().removePrefix("#").lowercase()
         context.dataStore.edit { preferences ->
             val current = preferences[BLACKLISTED_TAGS_KEY] ?: emptySet()
-            preferences[BLACKLISTED_TAGS_KEY] = current - tag
+            preferences[BLACKLISTED_TAGS_KEY] = current - cleanTag
         }
     }
 }

@@ -1,6 +1,9 @@
 package com.lurkah.app
 
 import android.net.Uri
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,7 +42,8 @@ fun ComposeVideoPlayer(
         }
     }
 
-    DisposableEffect(url) {
+    // FIX: exoPlayer als Key garantiert, dass genau diese Instanz aufgeräumt wird
+    DisposableEffect(exoPlayer) {
         onDispose {
             exoPlayer.pause()
             exoPlayer.stop()
@@ -47,8 +51,14 @@ fun ComposeVideoPlayer(
         }
     }
 
-    Media3Player(
-        player = exoPlayer,
-        modifier = modifier
-    )
+    Box(
+        modifier = modifier.clickable {
+            exoPlayer.playWhenReady = !exoPlayer.playWhenReady
+        }
+    ) {
+        Media3Player(
+            player = exoPlayer,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
 }

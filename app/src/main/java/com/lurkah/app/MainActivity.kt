@@ -18,6 +18,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -96,9 +97,13 @@ fun Modifier.verticalScrollbar(
         val totalCount = state.layoutInfo.totalItemsCount
 
         if (needDrawScrollbar && firstVisibleElementIndex != null && totalCount > 0) {
-            val elementHeight = size.height / totalCount
-            val scrollbarOffsetY = firstVisibleElementIndex * elementHeight
-            val scrollbarHeight = state.layoutInfo.visibleItemsInfo.size * elementHeight
+            val totalRows = (totalCount + 1) / 2
+            val firstVisibleRow = firstVisibleElementIndex / 2
+            val visibleRows = (state.layoutInfo.visibleItemsInfo.size + 1) / 2
+
+            val elementHeight = size.height / totalRows
+            val scrollbarOffsetY = firstVisibleRow * elementHeight
+            val scrollbarHeight = visibleRows * elementHeight
 
             drawRoundRect(
                 color = Color.Gray,
@@ -228,7 +233,10 @@ fun ImgurFeedScreen(
                 }
 
                 if (viewModel.isLoadingMore) {
-                    item(key = "loading_indicator") {
+                    item(
+                        key = "loading_indicator",
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -405,7 +413,7 @@ fun FullScreenFeedViewer(
         ) {
             HorizontalPager(
                 state = pagerState,
-                beyondViewportPageCount = 1,
+                beyondViewportPageCount = 0,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
@@ -442,7 +450,7 @@ fun FullScreenFeedViewer(
                 } else if (displayItems.size == 1) {
                     val img = displayItems.first()
                     val itemUrl = img.mp4 ?: img.link
-                    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
+                    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
                     if (isItemVideo) {
                         ComposeVideoPlayer(
@@ -477,7 +485,7 @@ fun FullScreenFeedViewer(
 
                         itemsIndexed(displayItems, key = { index, img -> "${img.id}_$index" }) { index, img ->
                             val itemUrl = img.mp4 ?: img.link
-                            val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
+                            val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
                             if (isItemVideo) {
                                 ComposeVideoPlayer(
@@ -493,7 +501,7 @@ fun FullScreenFeedViewer(
                                 )
                             } else {
                                 ZoomableMediaViewer(
-                                    url = if (itemUrl.endsWith(".gifv")) itemUrl.removeSuffix(".gifv") + ".jpg" else itemUrl,
+                                    url = itemUrl,
                                     contentDesc = post.title,
                                     isFullScreen = false,
                                     modifier = Modifier
