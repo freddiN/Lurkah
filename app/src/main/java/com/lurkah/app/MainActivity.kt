@@ -10,11 +10,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -44,15 +46,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -291,7 +297,7 @@ fun SmartMediaCard(
 
     val totalCount = post.imagesCount ?: post.images?.size ?: 1
     val labelText = if (post.isAlbum == true && totalCount > 1) {
-        "📁 ALBUM ($totalCount)" // Zeigt z.B. "📁 ALBUM (5)"
+        "📁 ALBUM ($totalCount)"
     } else {
         "${post.typeLabel} • ${post.formattedSize}"
     }
@@ -386,6 +392,8 @@ fun FullScreenFeedViewer(
         onDismiss()
     }
 
+    var expandedAlbumImage by remember { mutableStateOf<ImgurImage?>(null) }
+
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
         pageCount = { viewModel.posts.size }
@@ -399,7 +407,7 @@ fun FullScreenFeedViewer(
         currentPost?.let { post ->
             if (post.isAlbum == true || (post.images?.size ?: 1) > 1 || post.images.isNullOrEmpty()) {
                 delay(300)
-                viewModel.loadFullAlbumDetails(post.id, post) // Hier 'post' mit übergeben[cite: 26, 27]
+                viewModel.loadFullAlbumDetails(post.id, post)
             }
         }
 
@@ -518,6 +526,7 @@ fun FullScreenFeedViewer(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 8.dp)
+                                        .clickable { expandedAlbumImage = img }
                                 )
                             }
                         }
@@ -533,6 +542,63 @@ fun FullScreenFeedViewer(
                     .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
             ) {
                 Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        expandedAlbumImage?.let { img ->
+            val itemUrl = img.mp4 ?: img.link
+
+            val coroutineScope = rememberCoroutineScope()
+            val offsetY = remember { Animatable(0f) }
+
+            val backgroundAlpha = (1f - (abs(offsetY.value) / 1000f)).coerceIn(0f, 1f)
+
+            Dialog(
+                onDismissRequest = { expandedAlbumImage = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = backgroundAlpha))
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onDragEnd = {
+                                    if (abs(offsetY.value) > 300f) {
+                                        expandedAlbumImage = null
+                                    } else {
+                                        coroutineScope.launch { offsetY.animateTo(0f) }
+                                    }
+                                },
+                                onVerticalDrag = { _, dragAmount ->
+                                    coroutineScope.launch { offsetY.snapTo(offsetY.value + dragAmount) }
+                                }
+                            )
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .offset { IntOffset(0, offsetY.value.roundToInt()) }
+                    ) {
+                        ZoomableMediaViewer(
+                            url = itemUrl,
+                            contentDesc = "Expanded Image",
+                            isFullScreen = true,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        IconButton(
+                            onClick = { expandedAlbumImage = null },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(24.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+                        ) {
+                            Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
     }

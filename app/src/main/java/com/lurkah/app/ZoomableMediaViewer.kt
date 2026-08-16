@@ -61,15 +61,18 @@ fun ZoomableMediaViewer(
 
     // Beide Ansichten nutzen jetzt ZoomableAsyncImage für volle Zoom-Funktionalität
     if (isFullScreen) {
+        // Hier bleibt das Bild voll zoombar
         ZoomableAsyncImage(
             model = imageRequest,
             contentDescription = contentDesc,
             modifier = modifier.fillMaxSize()
         )
     } else {
-        ZoomableAsyncImage(
+        // In der Liste nutzen wir das normale AsyncImage zurück
+        AsyncImage(
             model = imageRequest,
             contentDescription = contentDesc,
+            contentScale = ContentScale.Inside,
             modifier = modifier
                 .fillMaxWidth()
                 .heightIn(min = 200.dp, max = 800.dp)
