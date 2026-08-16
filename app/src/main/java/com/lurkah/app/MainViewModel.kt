@@ -20,6 +20,8 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
 import java.util.Locale
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 
 // --- DATA MODELS ---
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
@@ -27,30 +29,36 @@ data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
 data class ImgurAlbumResponse(val data: ImgurAlbumData, val success: Boolean)
 data class ImgurAlbumData(val images: List<ImgurImage>?)
 
-data class ImgurPost(
+ddata class ImgurPost(
     val id: String,
     val title: String,
     @SerializedName("account_url") val accountUrl: String?,
     val images: List<ImgurImage>?,
     @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList(),
-    val size: Long?
+    val size: Long?,
+    // NEU: Diese Root-Eigenschaften fangen Single-Image-Posts ab
+    val link: String?,
+    val mp4: String?,
+    val type: String?
 ) {
     val tags: List<String>
         get() = rawTags?.map { it.name } ?: emptyList()
 
     private val mainMedia: ImgurImage? get() = images?.firstOrNull()
 
+    // GEFIXT: Greift auf die neuen Root-Eigenschaften zurück, wenn es kein Album ist
     val mediaUrl: String?
-        get() = mainMedia?.mp4 ?: mainMedia?.link ?: if (images == null) "https://i.imgur.com/$id.mp4" else null
+        get() = mainMedia?.mp4 ?: mainMedia?.link ?: mp4 ?: link
 
     val thumbnailUrl: String
         get() = "https://i.imgur.com/${mainMedia?.id ?: id}m.jpg"
 
+    // GEFIXT: Prüft auch den Root-Type
     val isVideo: Boolean
-        get() = (mainMedia?.type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true || mediaUrl?.endsWith(".gifv") == true
+        get() = (mainMedia?.type ?: type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true || mediaUrl?.endsWith(".gifv") == true
 
     val isGif: Boolean
-        get() = mainMedia?.type == "image/gif" || mediaUrl?.endsWith(".gif") == true
+        get() = mainMedia?.type == "image/gif" || type == "image/gif" || mediaUrl?.endsWith(".gif") == true
 
     val sizeInBytes: Long
         get() = mainMedia?.size ?: size ?: 0L
@@ -152,24 +160,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            blacklistedUsers.collect {
+            // Kombiniert beide Flows und überspringt den initialen State beim Start (.drop(1)),
+            // damit beim App-Start nicht sofort doppelte Refreshes getriggert werden.
+            combine(blacklistedUsers, blacklistedTags) { users, tags ->
+                Pair(users, tags)
+            }.drop(1).collect {
                 loadViralPosts(isRefresh = true)
             }
         }
-        viewModelScope.launch {
-            blacklistedTags.collect {
-                loadViralPosts(isRefresh = true)
-            }
-        }
+
+        // Initiales Laden der Posts beim Start der App
+        loadViralPosts(isRefresh = true)
     }
 
     fun loadViralPosts(isRefresh: Boolean = false) {
+        // Blockiert Nachladen, wenn schon geladen wird, ODER mehrfache Refreshes
         if (isLoadingMore && !isRefresh) return
+        if (isRefresh && isRefreshing) return
 
         viewModelScope.launch {
             if (isRefresh) {
                 isRefreshing = true
                 currentPage = 0
+                posts.clear() // WICHTIG: Sofort leeren, bevor der API Call startet!
             } else {
                 isLoadingMore = true
             }
@@ -187,9 +200,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         !currentBlacklist.contains(author) && !hasBlockedTag && post.mediaUrl != null
                     }
 
-                    if (isRefresh) {
-                        posts.clear()
-                    }
                     val existingIds = posts.map { it.id }.toSet()
                     val newUniquePosts = filtered.filter { !existingIds.contains(it.id) }
 

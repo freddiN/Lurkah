@@ -105,9 +105,10 @@ fun Modifier.verticalScrollbar(
         drawContent()
         val firstVisibleElementIndex = state.layoutInfo.visibleItemsInfo.firstOrNull()?.index
         val needDrawScrollbar = state.isScrollInProgress || alpha > 0f
+        val totalCount = state.layoutInfo.totalItemsCount
 
-        if (needDrawScrollbar && firstVisibleElementIndex != null) {
-            val elementHeight = size.height / state.layoutInfo.totalItemsCount
+        if (needDrawScrollbar && firstVisibleElementIndex != null && totalCount > 0) {
+            val elementHeight = size.height / totalCount
             val scrollbarOffsetY = firstVisibleElementIndex * elementHeight
             val scrollbarHeight = state.layoutInfo.visibleItemsInfo.size * elementHeight
 
@@ -397,17 +398,21 @@ fun FullScreenFeedViewer(
     autoReplay: Boolean,
     onDismiss: () -> Unit
 ) {
+    // Interzeptiert die Zurück-Taste, um den Vollbild-Viewer zu schließen statt die App zu beenden
+    BackHandler(enabled = true) {
+        onDismiss()
+    }
+
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
         pageCount = { viewModel.posts.size }
     )
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
-    // Lade Details für Alben und triggere Feed-Refresh bei Erreichen des Endes
     LaunchedEffect(pagerState.currentPage) {
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
-            if (post.images?.size ?: 1 > 1 || post.images == null) {
+            if ((post.images?.size ?: 1) > 1 || post.images == null) {
                 viewModel.loadFullAlbumDetails(post.id)
             }
         }
@@ -463,7 +468,6 @@ fun FullScreenFeedViewer(
                         CircularProgressIndicator(color = Color.White)
                     }
                 } else if (displayItems.size == 1) {
-                    // Einzelnes Bild oder Video - Vollbildanzeige
                     val img = displayItems.first()
                     val itemUrl = img.mp4 ?: img.link
                     val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
@@ -480,25 +484,25 @@ fun FullScreenFeedViewer(
                         ZoomableImage(
                             url = itemUrl,
                             contentDesc = post.title,
+                            isFullScreen = true,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                 } else {
-                    // Album - Scrollbar untereinander
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 64.dp)
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp)
                     ) {
                         item {
                             Text(
                                 text = post.title,
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.padding(16.dp)
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
 
-                        items(displayItems) { img ->
+                        itemsIndexed(displayItems, key = { index, img -> "${img.id}_$index" }) { index, img ->
                             val itemUrl = img.mp4 ?: img.link
                             val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
 
@@ -510,16 +514,16 @@ fun FullScreenFeedViewer(
                                     autoPlayVideos = autoPlayVideos,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .wrapContentHeight()
+                                        .height(350.dp)
                                         .padding(vertical = 8.dp)
                                 )
                             } else {
                                 ZoomableImage(
                                     url = if (itemUrl.endsWith(".gifv")) itemUrl.removeSuffix(".gifv") + ".jpg" else itemUrl,
                                     contentDesc = post.title,
+                                    isFullScreen = false,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .wrapContentHeight()
                                         .padding(vertical = 8.dp)
                                 )
                             }
@@ -545,18 +549,29 @@ fun FullScreenFeedViewer(
 fun ZoomableImage(
     url: String,
     contentDesc: String,
+    isFullScreen: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
+    val baseModifier = if (isFullScreen) {
+        modifier.fillMaxSize()
+    } else {
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 250.dp, max = 500.dp)
+    }
+
     Box(
-        modifier = modifier
+        modifier = baseModifier
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1f) {
+                    val newScale = scale * zoom
+                    // Aktiviere Zoom-Offset nur, wenn gezoomt wurde
+                    if (newScale > 1.05f || scale > 1f) {
+                        scale = newScale.coerceIn(1f, 5f)
                         offsetX += pan.x
                         offsetY += pan.y
                     } else {
@@ -565,7 +580,8 @@ fun ZoomableImage(
                         offsetY = 0f
                     }
                 }
-            }
+            },
+        contentAlignment = Alignment.Center
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
@@ -598,7 +614,7 @@ fun DetailMediaItem(
 ) {
     val context = LocalContext.current
 
-    val exoPlayer = remember(url) {
+    val exoPlayer = remember(url, context) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(url)))
             prepare()
@@ -607,11 +623,18 @@ fun DetailMediaItem(
 
     LaunchedEffect(autoReplay, autoPlayVideos, isCurrentPage) {
         exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+
+        // Steuert die Wiedergabe exakt nach Sichtbarkeit der Page:
         exoPlayer.playWhenReady = autoPlayVideos && isCurrentPage
+        if (!isCurrentPage) {
+            exoPlayer.pause()
+        }
     }
 
     DisposableEffect(url) {
         onDispose {
+            exoPlayer.pause()
+            exoPlayer.stop()
             exoPlayer.release()
         }
     }
@@ -646,9 +669,14 @@ fun DetailMediaItem(
                         }
                     )
 
-                    setOnTouchListener { _, event ->
-                        gestureDetector.onTouchEvent(event)
-                        true
+                    setOnTouchListener { v, event ->
+                        val handled = gestureDetector.onTouchEvent(event)
+                        if (event.action == MotionEvent.ACTION_UP && !handled) {
+                            v.performClick()
+                        }
+                        // Sobald gezwitschert/geswiped wird (MotionEvent.ACTION_MOVE), gibt der Detector false zurück.
+                        // Wir konsumieren das Event NICHT, damit der Pager swipen kann.
+                        handled
                     }
                 }
             },
