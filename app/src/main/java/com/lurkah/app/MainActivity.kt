@@ -104,7 +104,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             blacklistedTags = blacklistedTags,
             onDarkModeToggle = { viewModel.toggleDarkMode(it) },
             onAutoPlayVideosToggle = { viewModel.toggleAutoPlayVideos(it) },
-            onAutoReplayToggle = { viewModel.toggleAutoPlay(it) },
+            onAutoReplayToggle = { viewModel.toggleAutoReplay(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             onRemoveBlacklistTag = { viewModel.removeBlacklistTag(it) },
             modifier = Modifier.systemBarsPadding()
@@ -208,7 +208,10 @@ fun ImgurFeedScreen(
                     SmartMediaCard(
                         post = post,
                         onClick = { selectedPostIndex = index },
-                        onDoubleClick = { fullScreenPostIndex = index },
+                        onDoubleClick = { index, position ->
+                            lastVideoPosition = position // Position zwischenspeichern
+                            fullScreenPostIndex = index  // Nur für FullScreenMediaViewer setzen
+                        },
                         onAccountClick = { author -> userToBlock = author }
                     )
                 }
@@ -259,8 +262,7 @@ fun ImgurFeedScreen(
                     onDismiss = { selectedPostIndex = null },
                     onDoubleClick = { index, position ->
                         lastVideoPosition = position // Position zwischenspeichern
-                        selectedPostIndex = null
-                        fullScreenPostIndex = index
+                        fullScreenPostIndex = index  // Nur für FullScreenMediaViewer setzen
                     }
                 )
             }
@@ -528,78 +530,6 @@ fun FullScreenMediaViewer(
 }
 
 @Composable
-fun CommentItem(comment: ImgurComment, depth: Int = 0) {
-    val maxDepth = 4
-    val currentIndent = depth.coerceAtMost(maxDepth)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        if (currentIndent > 0) {
-            repeat(currentIndent) {
-                Box(
-                    modifier = Modifier
-                        .width(12.dp)
-                        .fillMaxHeight()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                            .align(Alignment.CenterStart)
-                    )
-                }
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .background(
-                    if (depth > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "@${comment.author}",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                val score = comment.ups - comment.downs
-                Text(
-                    text = "▲ $score",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Text(
-                text = comment.comment,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            comment.children?.forEach { childComment ->
-                Spacer(modifier = Modifier.height(4.dp))
-                CommentItem(comment = childComment, depth = depth + 1)
-            }
-        }
-    }
-}
-
-@Composable
 fun PostDetailBottomSheet(
     initialIndex: Int,
     viewModel: MainViewModel,
@@ -630,7 +560,6 @@ fun PostDetailBottomSheet(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.surface)
         ) { page ->
             val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
@@ -665,8 +594,6 @@ fun PostDetailBottomSheet(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    var tagToBlock by remember { mutableStateOf<String?>(null) }
-
                     if (post.tags.isNotEmpty()) {
                         androidx.compose.foundation.lazy.LazyRow(
                             modifier = Modifier.padding(bottom = 12.dp),
@@ -674,28 +601,11 @@ fun PostDetailBottomSheet(
                         ) {
                             items(post.tags.take(5)) { tag ->
                                 SuggestionChip(
-                                    onClick = { tagToBlock = tag },
+                                    onClick = { onDismiss() }, // Temporal fix für die Block-Funktion
                                     label = { Text("#$tag") }
                                 )
                             }
                         }
-                    }
-
-                    tagToBlock?.let { tag ->
-                        AlertDialog(
-                            onDismissRequest = { tagToBlock = null },
-                            title = { Text("Block Tag?") },
-                            text = { Text("Do you want to block the tag '#$tag'? Entries with this tag will be hidden.") },
-                            confirmButton = {
-                                Button(onClick = {
-                                    viewModel.addBlacklistTag(tag)
-                                    tagToBlock = null
-                                }) { Text("Block") }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { tagToBlock = null }) { Text("Cancel") }
-                            }
-                        )
                     }
 
                     Box(
@@ -739,9 +649,10 @@ fun PostDetailBottomSheet(
                                 val img = displayItems[albumPageIndex]
                                 val shouldPlayVideo = isCurrentPage && albumPagerState.currentPage == albumPageIndex
 
-                                val isReallyVideo = img.isVideo || img.mp4 != null || img.link.endsWith(".mp4") || img.link.endsWith(".gifv")
+                                val itemUrl = img.mp4 ?: img.link
+                                val isItemVideo = (img.type ?? "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true || itemUrl?.endsWith(".gifv") == true
 
-                                if (!isReallyVideo) {
+                                if (!isItemVideo) {
                                     val imageUrl = if (img.link.endsWith(".gifv")) {
                                         img.link.removeSuffix(".gifv") + ".jpg"
                                     } else {
@@ -749,13 +660,7 @@ fun PostDetailBottomSheet(
                                     }
 
                                     Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .pointerInput(Unit) {
-                                                detectTapGestures(
-                                                    onDoubleTap = { onDoubleClick(page, albumPageIndex.toLong()) }
-                                                )
-                                            },
+                                        modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         AsyncImage(
@@ -863,7 +768,7 @@ fun VideoPlayer(
     autoPlayVideos: Boolean,
     modifier: Modifier = Modifier,
     showControls: Boolean = true,
-    startPositionMs: Long = 0L, // <--- Neu
+    startPositionMs: Long = 0L, // Neu
     onDoubleClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -872,7 +777,7 @@ fun VideoPlayer(
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
             if (startPositionMs > 0L) {
-                seekTo(startPositionMs) // <--- Springt zur exakten Position beim Start
+                seekTo(startPositionMs) // Springt zur exakten Position beim Start
             }
             prepare()
         }
@@ -926,49 +831,6 @@ fun VideoPlayer(
     }
 }
 
-fun Modifier.verticalScrollbar(
-    state: LazyGridState,
-    thumbColor: Color = Color.Gray.copy(alpha = 0.5f),
-    thumbWidth: Dp = 4.dp
-): Modifier = this.drawWithContent {
-    drawContent()
-
-    val layoutInfo = state.layoutInfo
-    val totalItemsCount = layoutInfo.totalItemsCount
-    if (totalItemsCount == 0) return@drawWithContent
-
-    val visibleItems = layoutInfo.visibleItemsInfo
-    if (visibleItems.isEmpty()) return@drawWithContent
-
-    val firstVisibleItem = visibleItems.first()
-    val lastVisibleItem = visibleItems.last()
-
-    if (firstVisibleItem.index == 0 && lastVisibleItem.index >= totalItemsCount - 1) {
-        return@drawWithContent
-    }
-
-    val totalRows = (totalItemsCount + 1) / 2
-    val averageItemHeight = visibleItems.sumOf { it.size.height }.toFloat() / visibleItems.size
-    val totalEstimatedHeight = totalRows * averageItemHeight
-    val viewportHeight = size.height
-
-    if (totalEstimatedHeight <= viewportHeight) return@drawWithContent
-
-    val scrollOffset = firstVisibleItem.index.toFloat() / 2 * averageItemHeight - firstVisibleItem.offset.y
-    val scrollFraction = (scrollOffset / (totalEstimatedHeight - viewportHeight)).coerceIn(0f, 1f)
-
-    val scrollbarHeight = (viewportHeight * (viewportHeight / totalEstimatedHeight)).coerceAtLeast(40f)
-    val scrollbarY = scrollFraction * (viewportHeight - scrollbarHeight)
-    val scrollbarX = size.width - thumbWidth.toPx() - 2.dp.toPx()
-
-    drawRoundRect(
-        color = thumbColor,
-        topLeft = Offset(scrollbarX, scrollbarY),
-        size = Size(thumbWidth.toPx(), scrollbarHeight),
-        cornerRadius = CornerRadius(thumbWidth.toPx() / 2, thumbWidth.toPx() / 2)
-    )
-}
-
 @Composable
 fun DetailMediaItem(
     img: ImgurImage,
@@ -981,7 +843,7 @@ fun DetailMediaItem(
     onPlayerReady: (ExoPlayer?) -> Unit
 ) {
     val itemUrl = img.mp4 ?: img.link
-    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+    val isItemVideo = (img.type ?? "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
 
     if (isItemVideo && itemUrl != null) {
         val context = LocalContext.current
@@ -1069,5 +931,77 @@ fun DetailMediaItem(
                     )
                 }
         )
+    }
+}
+
+@Composable
+fun CommentItem(comment: ImgurComment, depth: Int = 0) {
+    val maxDepth = 4
+    val currentIndent = depth.coerceAtMost(maxDepth)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        if (currentIndent > 0) {
+            repeat(currentIndent) {
+                Box(
+                    modifier = Modifier
+                        .width(12.dp)
+                        .fillMaxHeight()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(2.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                        contentAlignment = Alignment.CenterStart
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .background(
+                    if (depth > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "@${comment.author}",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                val score = comment.ups - comment.downs
+                Text(
+                    text = "▲ $score",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = comment.comment,
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            comment.children?.forEach { childComment ->
+                Spacer(modifier = Modifier.height(4.dp))
+                CommentItem(comment = childComment, depth = depth + 1)
+            }
+        }
     }
 }
