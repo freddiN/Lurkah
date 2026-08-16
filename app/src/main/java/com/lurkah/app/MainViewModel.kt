@@ -61,8 +61,21 @@ data class ImgurPost(
     val isGif: Boolean
         get() = mainMedia?.type == "image/gif" || type == "image/gif" || mediaUrl?.endsWith(".gif") == true
 
+    // FIX: Verbesserte Dateigrößen-Ermittlung (durchsucht alle Bilder/Videos im Post nach einem gültigen Wert)
     val sizeInBytes: Long
-        get() = mainMedia?.size ?: size ?: 0L
+        get() {
+            // Lokale Variable erzwingt das Smart Casting in Kotlin
+            val media = mainMedia
+            if (media?.size != null && media.size > 0L) {
+                return media.size
+            }
+            images?.forEach { img ->
+                if (img.size != null && img.size > 0L) {
+                    return img.size
+                }
+            }
+            return 0L
+        }
 
     val formattedSize: String
         get() {
@@ -160,6 +173,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             combine(blacklistedUsers, blacklistedTags) { users, tags ->
                 Pair(users, tags)
             }.collect {
+                loadViralPosts(isRefresh = true)
+            }
+        }
+        viewModelScope.launch {
+            blacklistedTags.collect {
                 loadViralPosts(isRefresh = true)
             }
         }
