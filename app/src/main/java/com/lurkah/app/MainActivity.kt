@@ -8,6 +8,8 @@ package com.lurkah.app
 
 import android.net.Uri
 import android.os.Bundle
+import android.view.GestureDetector
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -160,11 +162,8 @@ fun ImgurFeedScreen(
     autoReplay: Boolean,
     onOpenSettings: () -> Unit
 ) {
-    var selectedPostIndex by remember { mutableStateOf<Int?>(null) }
-    var fullScreenPostIndex by remember { mutableStateOf<Int?>(null) }
-    var selectedAlbumIndex by remember { mutableIntStateOf(0) }
+    var fullScreenFeedIndex by remember { mutableStateOf<Int?>(null) }
     var userToBlock by remember { mutableStateOf<String?>(null) }
-    var lastVideoPosition by remember { mutableLongStateOf(0L) }
 
     val gridState = rememberLazyGridState()
     val pullToRefreshState = rememberPullToRefreshState()
@@ -244,12 +243,7 @@ fun ImgurFeedScreen(
                 ) { index, post ->
                     SmartMediaCard(
                         post = post,
-                        onClick = { selectedPostIndex = index },
-                        onDoubleClick = {
-                            lastVideoPosition = 0L
-                            selectedAlbumIndex = 0
-                            fullScreenPostIndex = index
-                        },
+                        onClick = { fullScreenFeedIndex = index },
                         onAccountClick = { author -> userToBlock = author }
                     )
                 }
@@ -290,33 +284,13 @@ fun ImgurFeedScreen(
                 )
             }
 
-            selectedPostIndex?.let { initialIndex ->
-                PostDetailBottomSheet(
-                    initialIndex = initialIndex,
+            fullScreenFeedIndex?.let { startIndex ->
+                FullScreenFeedViewer(
+                    initialIndex = startIndex,
                     viewModel = viewModel,
                     autoReplay = autoReplay,
-                    onDismiss = { selectedPostIndex = null },
-                    onDoubleClick = { albumIndex, position ->
-                        lastVideoPosition = position
-                        selectedAlbumIndex = albumIndex
-                        fullScreenPostIndex = initialIndex
-                    }
+                    onDismiss = { fullScreenFeedIndex = null }
                 )
-            }
-
-            fullScreenPostIndex?.let { postIndex ->
-                val currentPost = viewModel.posts.getOrNull(postIndex)
-                currentPost?.let { post ->
-                    FullScreenMediaViewer(
-                        initialIndex = selectedAlbumIndex,
-                        post = post,
-                        autoReplay = autoReplay,
-                        viewModel = viewModel,
-                        onDismiss = {
-                            fullScreenPostIndex = null
-                        }
-                    )
-                }
             }
         }
     }
@@ -326,11 +300,9 @@ fun ImgurFeedScreen(
 fun SmartMediaCard(
     post: ImgurPost,
     onClick: () -> Unit,
-    onDoubleClick: () -> Unit,
     onAccountClick: (String) -> Unit
 ) {
     val currentOnClick by rememberUpdatedState(onClick)
-    val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
     val context = LocalContext.current
 
     val imageCount = post.images?.size ?: 1
@@ -352,8 +324,7 @@ fun SmartMediaCard(
                     .aspectRatio(1f)
                     .pointerInput(Unit) {
                         detectTapGestures(
-                            onTap = { currentOnClick() },
-                            onDoubleTap = { currentOnDoubleClick() }
+                            onTap = { currentOnClick() }
                         )
                     }
             ) {
@@ -420,44 +391,35 @@ fun SmartMediaCard(
 }
 
 @Composable
-fun FullScreenMediaViewer(
+fun FullScreenFeedViewer(
     initialIndex: Int,
-    post: ImgurPost,
-    autoReplay: Boolean,
     viewModel: MainViewModel,
+    autoReplay: Boolean,
     onDismiss: () -> Unit
 ) {
-    val cachedImages = viewModel.albumImagesCache[post.id]
-    val displayItems = remember(cachedImages, post.images, post.mediaUrl) {
-        val rawList = when {
-            !cachedImages.isNullOrEmpty() -> cachedImages
-            !post.images.isNullOrEmpty() -> post.images
-            post.mediaUrl != null -> listOf(
-                ImgurImage(
-                    id = post.id,
-                    link = post.mediaUrl!!,
-                    mp4 = if (post.isVideo) post.mediaUrl else null,
-                    type = if (post.isVideo) "video/mp4" else "image/jpeg",
-                    size = post.sizeInBytes
-                )
-            )
-            else -> emptyList()
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
+        pageCount = { viewModel.posts.size }
+    )
+    val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
+
+    // Lade Details für Alben und triggere Feed-Refresh bei Erreichen des Endes
+    LaunchedEffect(pagerState.currentPage) {
+        val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
+        currentPost?.let { post ->
+            if (post.images?.size ?: 1 > 1 || post.images == null) {
+                viewModel.loadFullAlbumDetails(post.id)
+            }
         }
 
-        rawList.map { img ->
-            val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".jpg" else img.link
-            val fixedMp4 = img.mp4 ?: if (img.link.endsWith(".mp4")) img.link else null
-            img.copy(link = fixedLink, mp4 = fixedMp4)
+        if (pagerState.currentPage >= viewModel.posts.size - 3) {
+            viewModel.loadViralPosts(isRefresh = false)
         }
     }
 
-    val safeInitialPage = initialIndex.coerceIn(0, (displayItems.size - 1).coerceAtLeast(0))
-    val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { displayItems.size })
-    val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
-
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
     ) {
         Box(
             modifier = Modifier
@@ -469,83 +431,98 @@ fun FullScreenMediaViewer(
                 beyondBoundsPageCount = 1,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                val img = displayItems.getOrNull(page) ?: return@HorizontalPager
+                val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
                 val isCurrentPage = pagerState.currentPage == page
 
-                var scale by remember { mutableFloatStateOf(1f) }
-                var offsetX by remember { mutableFloatStateOf(0f) }
-                var offsetY by remember { mutableFloatStateOf(0f) }
+                val cachedImages = viewModel.albumImagesCache[post.id]
+                val displayItems = remember(cachedImages, post.images, post.mediaUrl) {
+                    val rawList = when {
+                        !cachedImages.isNullOrEmpty() -> cachedImages
+                        !post.images.isNullOrEmpty() -> post.images
+                        post.mediaUrl != null -> listOf(
+                            ImgurImage(
+                                id = post.id,
+                                link = post.mediaUrl!!,
+                                mp4 = if (post.isVideo) post.mediaUrl else null,
+                                type = if (post.isVideo) "video/mp4" else "image/jpeg",
+                                size = post.sizeInBytes
+                            )
+                        )
+                        else -> emptyList()
+                    }
 
-                val itemUrl = img.mp4 ?: img.link
-                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
+                    rawList.map { img ->
+                        val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
+                        val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
+                        img.copy(link = fixedLink, mp4 = fixedMp4)
+                    }
+                }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(scale) {
-                            if (scale > 1f) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    scale = (scale * zoom).coerceIn(1f, 5f)
-                                    if (scale > 1f) {
-                                        offsetX += pan.x
-                                        offsetY += pan.y
-                                    } else {
-                                        scale = 1f
-                                        offsetX = 0f
-                                        offsetY = 0f
-                                    }
-                                }
-                            }
-                        }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offsetX,
-                                translationY = offsetY
-                            ),
-                        contentAlignment = Alignment.Center
+                if (displayItems.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                } else if (displayItems.size == 1) {
+                    // Einzelnes Bild oder Video - Vollbildanzeige
+                    val img = displayItems.first()
+                    val itemUrl = img.mp4 ?: img.link
+                    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
+
+                    if (isItemVideo) {
+                        DetailMediaItem(
+                            url = itemUrl,
+                            isCurrentPage = isCurrentPage,
+                            autoReplay = autoReplay,
+                            autoPlayVideos = autoPlayVideos,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        ZoomableImage(
+                            url = itemUrl,
+                            contentDesc = post.title,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                } else {
+                    // Album - Scrollbar untereinander
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 64.dp)
                     ) {
-                        if (isItemVideo) {
-                            DetailMediaItem(
-                                img = img,
-                                imgIndex = page,
-                                post = post,
-                                isCurrentPage = isCurrentPage,
-                                autoReplay = autoReplay,
-                                autoPlayVideos = autoPlayVideos,
-                                onDoubleClick = { },
-                                onPlayerReady = { }
+                        item {
+                            Text(
+                                text = post.title,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(16.dp)
                             )
-                        } else {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(itemUrl)
-                                    .crossfade(true)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .build(),
-                                contentDescription = post.title,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onDoubleTap = {
-                                                if (scale > 1f) {
-                                                    scale = 1f
-                                                    offsetX = 0f
-                                                    offsetY = 0f
-                                                } else {
-                                                    scale = 2.5f
-                                                }
-                                            }
-                                        )
-                                    }
-                            )
+                        }
+
+                        items(displayItems) { img ->
+                            val itemUrl = img.mp4 ?: img.link
+                            val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
+
+                            if (isItemVideo) {
+                                DetailMediaItem(
+                                    url = itemUrl,
+                                    isCurrentPage = isCurrentPage,
+                                    autoReplay = autoReplay,
+                                    autoPlayVideos = autoPlayVideos,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .wrapContentHeight()
+                                        .padding(vertical = 8.dp)
+                                )
+                            } else {
+                                ZoomableImage(
+                                    url = if (itemUrl.endsWith(".gifv")) itemUrl.removeSuffix(".gifv") + ".jpg" else itemUrl,
+                                    contentDesc = post.title,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .wrapContentHeight()
+                                        .padding(vertical = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -565,439 +542,123 @@ fun FullScreenMediaViewer(
 }
 
 @Composable
-fun PostDetailBottomSheet(
-    initialIndex: Int,
-    viewModel: MainViewModel,
-    autoReplay: Boolean,
-    onDismiss: () -> Unit,
-    onDoubleClick: (Int, Long) -> Unit
+fun ZoomableImage(
+    url: String,
+    contentDesc: String,
+    modifier: Modifier = Modifier
 ) {
-    val safeInitialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0))
-    val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { viewModel.posts.size })
-    val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
 
-    var activePlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-
-    LaunchedEffect(pagerState.currentPage) {
-        val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
-        currentPost?.let { post ->
-            viewModel.loadCommentsForPost(post.id)
-            viewModel.loadFullAlbumDetails(post.id)
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        modifier = Modifier.fillMaxHeight(0.9f)
-    ) {
-        HorizontalPager(
-            state = pagerState,
-            beyondBoundsPageCount = 1,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-        ) { page ->
-            val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
-            val isCurrentPage = pagerState.currentPage == page
-
-            val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(bottom = 64.dp)
-            ) {
-                item {
-                    Text(
-                        text = post.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    val imageCount = currentImages?.size ?: post.images?.size ?: 1
-                    val typeLabelText = if (imageCount > 1) {
-                        "📁 ALBUM ($imageCount items)"
+    Box(
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 5f)
+                    if (scale > 1f) {
+                        offsetX += pan.x
+                        offsetY += pan.y
                     } else {
-                        "${post.typeLabel} • File size: ${post.formattedSize}"
-                    }
-
-                    Text(
-                        text = typeLabelText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    if (post.tags.isNotEmpty()) {
-                        androidx.compose.foundation.lazy.LazyRow(
-                            modifier = Modifier.padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            items(post.tags.take(5)) { tag ->
-                                SuggestionChip(
-                                    onClick = { onDismiss() },
-                                    label = { Text("#$tag") }
-                                )
-                            }
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(350.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(8.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val cachedImages = viewModel.albumImagesCache[post.id]
-
-                        val displayItems = remember(cachedImages, post.images, post.mediaUrl) {
-                            val rawList = when {
-                                !cachedImages.isNullOrEmpty() -> cachedImages
-                                !post.images.isNullOrEmpty() -> post.images
-                                post.mediaUrl != null -> listOf(
-                                    ImgurImage(
-                                        id = post.id,
-                                        link = post.mediaUrl!!,
-                                        mp4 = if (post.isVideo) post.mediaUrl else null,
-                                        type = if (post.isVideo) "video/mp4" else "image/jpeg",
-                                        size = post.sizeInBytes
-                                    )
-                                )
-                                else -> emptyList()
-                            }
-
-                            rawList.map { img ->
-                                val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
-                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
-                                img.copy(link = fixedLink, mp4 = fixedMp4)
-                            }
-                        }
-
-                        if (displayItems.isEmpty()) {
-                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                        } else {
-                            val albumPagerState = rememberPagerState(pageCount = { displayItems.size })
-
-                            HorizontalPager(
-                                state = albumPagerState,
-                                beyondBoundsPageCount = 1,
-                                modifier = Modifier.fillMaxSize()
-                            ) { albumPageIndex ->
-                                val img = displayItems[albumPageIndex]
-                                val shouldPlayVideo = isCurrentPage && albumPagerState.currentPage == albumPageIndex
-
-                                val itemUrl = img.mp4 ?: img.link
-                                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
-
-                                if (!isItemVideo) {
-                                    val imageUrl = if (img.link.endsWith(".gifv")) {
-                                        img.link.removeSuffix(".gifv") + ".jpg"
-                                    } else {
-                                        img.link
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .pointerInput(Unit) {
-                                                detectTapGestures(
-                                                    onDoubleTap = {
-                                                        onDoubleClick(albumPageIndex, 0L)
-                                                    }
-                                                )
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(LocalContext.current)
-                                                .data(imageUrl)
-                                                .placeholderMemoryCacheKey(post.thumbnailUrl)
-                                                .crossfade(true)
-                                                .diskCachePolicy(CachePolicy.ENABLED)
-                                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                                .build(),
-                                            contentDescription = post.title,
-                                            contentScale = ContentScale.Fit,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                } else {
-                                    DetailMediaItem(
-                                        img = img,
-                                        imgIndex = albumPageIndex,
-                                        post = post,
-                                        isCurrentPage = shouldPlayVideo,
-                                        autoReplay = autoReplay,
-                                        autoPlayVideos = autoPlayVideos,
-                                        onDoubleClick = { currentPos ->
-                                            activePlayer?.playWhenReady = false
-                                            onDoubleClick(albumPageIndex, currentPos)
-                                        },
-                                        onPlayerReady = { player ->
-                                            if (player != null) {
-                                                if (!shouldPlayVideo) {
-                                                    player.playWhenReady = false
-                                                } else {
-                                                    activePlayer = player
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-
-                            if (displayItems.size > 1) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.Black.copy(alpha = 0.6f),
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(8.dp)
-                                ) {
-                                    Text(
-                                        text = "${albumPagerState.currentPage + 1} / ${displayItems.size}",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = "Comments",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                }
-
-                if (viewModel.isLoadingComments) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                } else if (viewModel.selectedPostComments.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No comments available.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
+                        scale = 1f
+                        offsetX = 0f
+                        offsetY = 0f
                     }
                 }
-
-                items(
-                    items = viewModel.selectedPostComments,
-                    key = { comment -> comment.id }
-                ) { comment ->
-                    CommentItem(comment = comment, depth = 0)
-                }
             }
-        }
-    }
-}
-
-@Composable
-fun DetailMediaItem(
-    img: ImgurImage,
-    imgIndex: Int,
-    post: ImgurPost,
-    isCurrentPage: Boolean,
-    autoReplay: Boolean,
-    autoPlayVideos: Boolean,
-    onDoubleClick: (Long) -> Unit,
-    onPlayerReady: (ExoPlayer?) -> Unit
-) {
-    val itemUrl = img.mp4 ?: img.link
-    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
-
-    if (isItemVideo) {
-        val context = LocalContext.current
-        var localPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-
-        val exoPlayer = remember(itemUrl) {
-            ExoPlayer.Builder(context).build().apply {
-                setMediaItem(MediaItem.fromUri(Uri.parse(itemUrl)))
-                prepare()
-            }
-        }
-
-        LaunchedEffect(exoPlayer) {
-            localPlayer = exoPlayer
-            if (isCurrentPage) onPlayerReady(exoPlayer)
-        }
-
-        LaunchedEffect(autoReplay, autoPlayVideos, isCurrentPage) {
-            exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-            exoPlayer.playWhenReady = autoPlayVideos && isCurrentPage
-            if (isCurrentPage) onPlayerReady(exoPlayer)
-        }
-
-        DisposableEffect(itemUrl) {
-            onDispose {
-                exoPlayer.release()
-                onPlayerReady(null)
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 350.dp)
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = exoPlayer
-                        useController = true
-                        controllerAutoShow = false
-                        controllerShowTimeoutMs = 2500
-                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-
-                        hideController()
-
-                        val gestureDetector = android.view.GestureDetector(
-                            ctx,
-                            object : android.view.GestureDetector.SimpleOnGestureListener() {
-                                override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
-                                    if (isControllerFullyVisible) {
-                                        hideController()
-                                    } else {
-                                        showController()
-                                    }
-                                    return true
-                                }
-
-                                override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
-                                    val currentPos = localPlayer?.currentPosition ?: 0L
-                                    onDoubleClick(currentPos)
-                                    return true
-                                }
-                            }
-                        )
-                        setOnTouchListener { _, event ->
-                            gestureDetector.onTouchEvent(event)
-                            true
-                        }
-                    }
-                },
-                update = { playerView ->
-                    if (playerView.player != exoPlayer) {
-                        playerView.player = exoPlayer
-                        playerView.hideController()
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    } else {
+    ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(itemUrl)
+                .data(url)
+                .crossfade(true)
                 .diskCachePolicy(CachePolicy.ENABLED)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .build(),
-            contentDescription = "${post.title} - ${imgIndex + 1}",
+            contentDescription = contentDesc,
             contentScale = ContentScale.Fit,
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 350.dp)
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = { onDoubleClick(0L) }
-                    )
-                }
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY
+                )
         )
     }
 }
 
 @Composable
-fun CommentItem(comment: ImgurComment, depth: Int = 0) {
-    val maxDepth = 4
-    val currentIndent = depth.coerceAtMost(maxDepth)
+fun DetailMediaItem(
+    url: String,
+    isCurrentPage: Boolean,
+    autoReplay: Boolean,
+    autoPlayVideos: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
+    val exoPlayer = remember(url) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+            prepare()
+        }
+    }
+
+    LaunchedEffect(autoReplay, autoPlayVideos, isCurrentPage) {
+        exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+        exoPlayer.playWhenReady = autoPlayVideos && isCurrentPage
+    }
+
+    DisposableEffect(url) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    Box(
+        modifier = modifier.background(Color.Black),
+        contentAlignment = Alignment.Center
     ) {
-        if (currentIndent > 0) {
-            repeat(currentIndent) {
-                Box(
-                    modifier = Modifier
-                        .width(12.dp)
-                        .fillMaxHeight(),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.outlineVariant)
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = true
+                    controllerAutoShow = false
+                    controllerShowTimeoutMs = 2500
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+
+                    hideController()
+
+                    val gestureDetector = GestureDetector(
+                        ctx,
+                        object : GestureDetector.SimpleOnGestureListener() {
+                            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                                if (isControllerFullyVisible) {
+                                    hideController()
+                                } else {
+                                    showController()
+                                }
+                                return true
+                            }
+                        }
                     )
+
+                    setOnTouchListener { _, event ->
+                        gestureDetector.onTouchEvent(event)
+                        true
+                    }
                 }
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .background(
-                    if (depth > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "@${comment.author}",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                val score = comment.ups - comment.downs
-                Text(
-                    text = "▲ $score",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Text(
-                text = comment.comment,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            comment.children?.forEach { childComment ->
-                Spacer(modifier = Modifier.height(4.dp))
-                CommentItem(comment = childComment, depth = depth + 1)
-            }
-        }
+            },
+            update = { playerView ->
+                if (playerView.player != exoPlayer) {
+                    playerView.player = exoPlayer
+                    playerView.hideController()
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }

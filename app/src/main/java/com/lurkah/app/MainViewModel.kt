@@ -3,6 +3,7 @@ package com.lurkah.app
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
@@ -21,7 +23,6 @@ import java.util.Locale
 
 // --- DATA MODELS ---
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
-data class ImgurCommentsResponse(val data: List<ImgurComment>, val success: Boolean)
 
 data class ImgurAlbumResponse(val data: ImgurAlbumData, val success: Boolean)
 data class ImgurAlbumData(val images: List<ImgurImage>?)
@@ -86,15 +87,6 @@ data class ImgurImage(
     val size: Long?
 )
 
-data class ImgurComment(
-    val id: Long,
-    val comment: String,
-    val author: String,
-    val ups: Int,
-    val downs: Int,
-    val children: List<ImgurComment>? = emptyList()
-)
-
 // --- API SERVICE ---
 interface ImgurApiService {
     @GET("3/gallery/hot/viral/{page}")
@@ -102,12 +94,6 @@ interface ImgurApiService {
         @Header("Authorization") authHeader: String,
         @Path("page") page: Int = 0
     ): ImgurResponse
-
-    @GET("3/gallery/{galleryHash}/comments/best")
-    suspend fun getComments(
-        @Header("Authorization") authHeader: String,
-        @Path("galleryHash") galleryHash: String
-    ): ImgurCommentsResponse
 
     @GET("3/album/{id}")
     suspend fun getAlbumDetails(
@@ -155,19 +141,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var posts = mutableStateListOf<ImgurPost>()
         private set
 
-    var selectedPostComments = mutableStateListOf<ImgurComment>()
-        private set
-
     var isRefreshing by mutableStateOf(false)
         private set
 
     var isLoadingMore by mutableStateOf(false)
         private set
 
-    var isLoadingComments by mutableStateOf(false)
-        private set
-
     private var currentPage = 0
+    val albumImagesCache = mutableStateMapOf<String, List<ImgurImage>>()
 
     init {
         viewModelScope.launch {
@@ -217,6 +198,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     errorMessage = "Failed to load viral posts."
                 }
+            } catch (e: HttpException) {
+                e.printStackTrace()
+                errorMessage = if (e.code() == 429) {
+                    "Rate limit reached. Please wait a bit before requesting more posts."
+                } else {
+                    "HTTP Error: ${e.code()} - ${e.message()}"
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 errorMessage = "Network error: ${e.localizedMessage ?: "Please check your connection."}"
@@ -227,20 +215,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadCommentsForPost(postId: String) {
+    fun loadFullAlbumDetails(postId: String) {
+        if (albumImagesCache.containsKey(postId)) return
+
         viewModelScope.launch {
-            isLoadingComments = true
-            selectedPostComments.clear()
             try {
-                val response = api.getComments(authHeader = clientId, galleryHash = postId)
-                if (response.success) {
-                    selectedPostComments.addAll(response.data)
+                val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
+                if (response.success && !response.data.images.isNullOrEmpty()) {
+                    albumImagesCache[postId] = response.data.images
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                errorMessage = "Could not load comments."
-            } finally {
-                isLoadingComments = false
             }
         }
     }
@@ -253,7 +238,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsManager.setAutoPlayVideos(enabled) }
     }
 
-    fun toggleAutoReplay(enabled: Boolean) { // <--- Hier umbenannt
+    fun toggleAutoReplay(enabled: Boolean) {
         viewModelScope.launch { settingsManager.setAutoReplay(enabled) }
     }
 
@@ -271,23 +256,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeBlacklistTag(tag: String) {
         viewModelScope.launch { settingsManager.removeBlacklistedTag(tag) }
-    }
-
-    val albumImagesCache = androidx.compose.runtime.mutableStateMapOf<String, List<ImgurImage>>()
-
-    fun loadFullAlbumDetails(postId: String) {
-        if (albumImagesCache.containsKey(postId)) return
-
-        viewModelScope.launch {
-            try {
-                val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
-                if (response.success && !response.data.images.isNullOrEmpty()) {
-                    // Warnung behoben: Kein '!!' notwendig, da durch isNullOrEmpty() bereits als non-null smart-gecastet
-                    albumImagesCache[postId] = response.data.images
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 }
