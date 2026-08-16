@@ -38,6 +38,7 @@ data class ImgurPost(
     val mp4: String?,
     val type: String?,
     @SerializedName("is_album") val isAlbum: Boolean?,
+    @SerializedName("images_count") val imagesCount: Int?,
     val cover: String?
 ) {
     val tags: List<String>

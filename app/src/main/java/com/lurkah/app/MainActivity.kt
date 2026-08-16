@@ -289,9 +289,9 @@ fun SmartMediaCard(
     val currentOnClick by rememberUpdatedState(onClick)
     val context = LocalContext.current
 
-    val hasMultipleImages = (post.images?.size ?: 1) > 1
-    val labelText = if (post.isAlbum == true && hasMultipleImages) {
-        "📁 ALBUM"
+    val totalCount = post.imagesCount ?: post.images?.size ?: 1
+    val labelText = if (post.isAlbum == true && totalCount > 1) {
+        "📁 ALBUM ($totalCount)" // Zeigt z.B. "📁 ALBUM (5)"
     } else {
         "${post.typeLabel} • ${post.formattedSize}"
     }
