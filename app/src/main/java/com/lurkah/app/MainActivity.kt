@@ -465,7 +465,7 @@ fun FullScreenMediaViewer(
 
                             rawList.map { img ->
                                 val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
-                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
+                                val fixedMp4 = img.mp4 ?: if (fixedLink.endswith(".mp4")) fixedLink else null
                                 img.copy(link = fixedLink, mp4 = fixedMp4)
                             }
                         }
@@ -481,7 +481,7 @@ fun FullScreenMediaViewer(
                                     isMuted = false,
                                     autoReplay = autoReplay,
                                     autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                    showControls = true,
+                                    showControls = true,  // Für FullScreenMediaViewer: Controls sichtbar
                                     startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -601,7 +601,7 @@ fun PostDetailBottomSheet(
                         ) {
                             items(post.tags.take(5)) { tag ->
                                 SuggestionChip(
-                                    onClick = { onDismiss() }, // Temporal fix für die Block-Funktion
+                                    onClick = { onDismiss() },
                                     label = { Text("#$tag") }
                                 )
                             }
@@ -767,8 +767,8 @@ fun VideoPlayer(
     autoReplay: Boolean,
     autoPlayVideos: Boolean,
     modifier: Modifier = Modifier,
-    showControls: Boolean = true,
-    startPositionMs: Long = 0L, // Neu
+    showControls: Boolean = false,  // Nur wenn explizit gewünscht
+    startPositionMs: Long = 0L,   // Neu
     onDoubleClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -786,10 +786,11 @@ fun VideoPlayer(
     LaunchedEffect(autoReplay, autoPlayVideos, isMuted) {
         exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         exoPlayer.volume = if (isMuted) 0f else 1f
-        exoPlayer.playWhenReady = autoPlayVideos
+        // Nur autoplay wenn explizit aktiviert (nicht automatisch beim Start)
+        exoPlayer.playWhenReady = autoPlayVideos && showControls || autoPlayVideos
     }
 
-    DisposableEffect(videoUrl) {
+    DisposableEffect(videoUrl, isMuted) {
         onDispose {
             exoPlayer.release()
         }
@@ -800,8 +801,9 @@ fun VideoPlayer(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
-                    useController = showControls
-                    controllerAutoShow = false
+                    // ✅ Controls werden nicht automatisch aktiviert (false)
+                    useController = false
+                    controllerAutoShow = true  // ✅ Controls tauschen sich beim Touch ein/aus
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
@@ -824,7 +826,6 @@ fun VideoPlayer(
                 if (playerView.player != exoPlayer) {
                     playerView.player = exoPlayer
                 }
-                playerView.useController = showControls
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -843,7 +844,7 @@ fun DetailMediaItem(
     onPlayerReady: (ExoPlayer?) -> Unit
 ) {
     val itemUrl = img.mp4 ?: img.link
-    val isItemVideo = (img.type ?? "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
 
     if (isItemVideo && itemUrl != null) {
         val context = LocalContext.current
@@ -878,14 +879,16 @@ fun DetailMediaItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 350.dp)
-                .background(Color.Black)
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
         ) {
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         player = exoPlayer
-                        useController = true
-                        controllerAutoShow = false
+                        // ✅ Controls werden nicht automatisch aktiviert (false)
+                        useController = false
+                        controllerAutoShow = true  // ✅ Controls tauschen sich beim Touch ein/aus
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
