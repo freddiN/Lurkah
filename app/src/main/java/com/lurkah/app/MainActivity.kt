@@ -589,6 +589,7 @@ fun PostDetailBottomSheet(
     ) {
         HorizontalPager(
             state = pagerState,
+            beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
@@ -643,7 +644,7 @@ fun PostDetailBottomSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(350.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)),
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         val cachedImages = viewModel.albumImagesCache[post.id]
@@ -675,6 +676,7 @@ fun PostDetailBottomSheet(
 
                             HorizontalPager(
                                 state = albumPagerState,
+                                beyondViewportPageCount = 1,
                                 modifier = Modifier.fillMaxSize()
                             ) { albumPageIndex ->
                                 val img = displayItems[albumPageIndex]
@@ -696,7 +698,7 @@ fun PostDetailBottomSheet(
                                             .pointerInput(Unit) {
                                                 detectTapGestures(
                                                     onDoubleTap = {
-                                                        // Öffnet das Bild direkt im Vollbild-Viewer
+                                                        // Öffnet das Bild analog zum Video im Vollbild
                                                         onDoubleClick(page, 0L)
                                                     }
                                                 )
