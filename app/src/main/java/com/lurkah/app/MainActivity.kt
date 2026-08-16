@@ -831,14 +831,24 @@ fun VideoPlayer(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
-                    useController = false
-                    controllerAutoShow = true
+                    useController = true
+                    controllerAutoShow = false
+                    controllerShowTimeoutMs = 2500
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
                     val gestureDetector = android.view.GestureDetector(
                         ctx,
                         object : android.view.GestureDetector.SimpleOnGestureListener() {
+                            override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
+                                if (isControllerFullyVisible) {
+                                    hideController()
+                                } else {
+                                    showController()
+                                }
+                                return true
+                            }
+
                             override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
                                 onDoubleClick?.invoke()
                                 return true
@@ -847,7 +857,7 @@ fun VideoPlayer(
                     )
                     setOnTouchListener { _, event ->
                         gestureDetector.onTouchEvent(event)
-                        false
+                        true
                     }
                 }
             },
@@ -915,14 +925,24 @@ fun DetailMediaItem(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         player = exoPlayer
-                        useController = false
-                        controllerAutoShow = true
+                        useController = true
+                        controllerAutoShow = false
+                        controllerShowTimeoutMs = 2500
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
                         val gestureDetector = android.view.GestureDetector(
                             ctx,
                             object : android.view.GestureDetector.SimpleOnGestureListener() {
+                                override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
+                                    if (isControllerFullyVisible) {
+                                        hideController()
+                                    } else {
+                                        showController()
+                                    }
+                                    return true
+                                }
+
                                 override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
                                     val currentPos = localPlayer?.currentPosition ?: 0L
                                     onDoubleClick(currentPos)
@@ -932,7 +952,7 @@ fun DetailMediaItem(
                         )
                         setOnTouchListener { _, event ->
                             gestureDetector.onTouchEvent(event)
-                            false
+                            true
                         }
                     }
                 },
