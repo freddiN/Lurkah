@@ -393,11 +393,15 @@ fun FullScreenFeedViewer(
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             if ((post.images?.size ?: 1) > 1 || post.images == null) {
+                // FIX: Kurze Verzögerung, um sicherzustellen, dass die Bilder geladen sind
+                delay(300)
                 viewModel.loadFullAlbumDetails(post.id)
             }
         }
 
         if (pagerState.currentPage >= viewModel.posts.size - 3) {
+            // FIX: Verzögerung beim Weiterblättern, um sicherzustellen, dass die Bilder geladen sind
+            delay(300)
             viewModel.loadViralPosts(isRefresh = false)
         }
     }
