@@ -29,14 +29,13 @@ data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
 data class ImgurAlbumResponse(val data: ImgurAlbumData, val success: Boolean)
 data class ImgurAlbumData(val images: List<ImgurImage>?)
 
-ddata class ImgurPost(
+data class ImgurPost(
     val id: String,
     val title: String,
     @SerializedName("account_url") val accountUrl: String?,
     val images: List<ImgurImage>?,
     @SerializedName("tags") val rawTags: List<ImgurTag>? = emptyList(),
     val size: Long?,
-    // NEU: Diese Root-Eigenschaften fangen Single-Image-Posts ab
     val link: String?,
     val mp4: String?,
     val type: String?
@@ -46,14 +45,12 @@ ddata class ImgurPost(
 
     private val mainMedia: ImgurImage? get() = images?.firstOrNull()
 
-    // GEFIXT: Greift auf die neuen Root-Eigenschaften zurück, wenn es kein Album ist
     val mediaUrl: String?
         get() = mainMedia?.mp4 ?: mainMedia?.link ?: mp4 ?: link
 
     val thumbnailUrl: String
         get() = "https://i.imgur.com/${mainMedia?.id ?: id}m.jpg"
 
-    // GEFIXT: Prüft auch den Root-Type
     val isVideo: Boolean
         get() = (mainMedia?.type ?: type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true || mediaUrl?.endsWith(".gifv") == true
 
