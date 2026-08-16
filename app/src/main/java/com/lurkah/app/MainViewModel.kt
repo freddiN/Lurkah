@@ -96,10 +96,6 @@ data class ImgurImage(
     val size: Long?
 )
 
-data class ImgurItemResponse(
-    val data: ImgurPost
-)
-
 interface ImgurApiService {
     @GET("3/gallery/hot/viral/{page}")
     suspend fun getMostViral(
@@ -112,12 +108,6 @@ interface ImgurApiService {
         @Header("Authorization") authHeader: String,
         @Path("id") albumId: String
     ): ImgurAlbumResponse
-
-    @GET("3/gallery/{id}")
-    suspend fun getGalleryItem(
-        @Header("Authorization") authHeader: String,
-        @Path("id") galleryId: String
-    ): ImgurItemResponse
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {

@@ -457,7 +457,8 @@ fun FullScreenFeedViewer(
                             img.link.isBlank() && post.mediaUrl != null -> post.mediaUrl!!
                             else -> img.link
                         }
-                        val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
+                        // HIER: mp4 nur übernehmen, wenn es nicht leer ist
+                        val fixedMp4 = img.mp4.takeIf { !it.isNullOrBlank() } ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
                         img.copy(link = fixedLink, mp4 = fixedMp4)
                     }.filter { it.link.isNotBlank() }
                 }
@@ -468,7 +469,8 @@ fun FullScreenFeedViewer(
                     }
                 } else if (displayItems.size == 1) {
                     val img = displayItems.first()
-                    val itemUrl = img.mp4 ?: img.link
+                    // HIER KORRIGIERT: takeIf { !it.isNullOrBlank() }
+                    val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
                     val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
                     if (isItemVideo) {
@@ -503,7 +505,8 @@ fun FullScreenFeedViewer(
                         }
 
                         itemsIndexed(displayItems, key = { index, img -> "${img.id}_$index" }) { index, img ->
-                            val itemUrl = img.mp4 ?: img.link
+                            // HIER KORRIGIERT: takeIf { !it.isNullOrBlank() }
+                            val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
                             val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
                             if (isItemVideo) {
@@ -546,7 +549,8 @@ fun FullScreenFeedViewer(
         }
 
         expandedAlbumImage?.let { img ->
-            val itemUrl = img.mp4 ?: img.link
+            // HIER KORRIGIERT: takeIf { !it.isNullOrBlank() }
+            val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
 
             val coroutineScope = rememberCoroutineScope()
             val offsetY = remember { Animatable(0f) }
