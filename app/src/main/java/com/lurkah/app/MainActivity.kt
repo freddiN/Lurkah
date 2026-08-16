@@ -53,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import androidx.compose.foundation.lazy.grid.LazyGridState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -273,6 +274,7 @@ fun ImgurFeedScreen(
                 initialIndex = startIndex,
                 viewModel = viewModel,
                 autoReplay = autoReplay,
+                gridState = gridState,
                 onDismiss = { fullScreenFeedIndex = null }
             )
         }
@@ -378,6 +380,7 @@ fun FullScreenFeedViewer(
     initialIndex: Int,
     viewModel: MainViewModel,
     autoReplay: Boolean,
+    gridState: LazyGridState,
     onDismiss: () -> Unit
 ) {
     BackHandler(enabled = true) {
@@ -391,17 +394,15 @@ fun FullScreenFeedViewer(
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
     LaunchedEffect(pagerState.currentPage) {
+        gridState.scrollToItem(pagerState.currentPage)
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             if ((post.images?.size ?: 1) > 1 || post.images == null) {
-                // FIX: Kurze Verzögerung, um sicherzustellen, dass die Bilder geladen sind
-                delay(300)
                 viewModel.loadFullAlbumDetails(post.id)
             }
         }
 
         if (pagerState.currentPage >= viewModel.posts.size - 3) {
-            // FIX: Verzögerung beim Weiterblättern, um sicherzustellen, dass die Bilder geladen sind
             delay(300)
             viewModel.loadViralPosts(isRefresh = false)
         }
