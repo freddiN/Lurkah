@@ -27,7 +27,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,7 +38,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -169,18 +168,6 @@ fun ImgurFeedScreen(
         )
     }
 
-    if (pullToRefreshState.isRefreshing) {
-        LaunchedEffect(true) {
-            viewModel.loadViralPosts(isRefresh = true)
-        }
-    }
-
-    LaunchedEffect(viewModel.isRefreshing) {
-        if (!viewModel.isRefreshing) {
-            pullToRefreshState.endRefresh()
-        }
-    }
-
     val shouldLoadMore by remember {
         derivedStateOf {
             val totalItems = gridState.layoutInfo.totalItemsCount
@@ -212,12 +199,14 @@ fun ImgurFeedScreen(
             )
         }
     ) { padding ->
-        Box(
+        PullToRefreshBox(
+            isRefreshing = viewModel.isRefreshing,
+            onRefresh = { viewModel.loadViralPosts(isRefresh = true) },
+            state = pullToRefreshState,
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
-                .nestedScroll(pullToRefreshState.nestedScrollConnection)
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -251,37 +240,32 @@ fun ImgurFeedScreen(
                     }
                 }
             }
+        }
 
-            PullToRefreshContainer(
-                state = pullToRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter)
+        userToBlock?.let { author ->
+            AlertDialog(
+                onDismissRequest = { userToBlock = null },
+                title = { Text("Block User?") },
+                text = { Text("Do you want to add '@$author' to your blocked list?") },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.addBlacklistUser(author)
+                        userToBlock = null
+                    }) { Text("Block") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { userToBlock = null }) { Text("Cancel") }
+                }
             )
+        }
 
-            userToBlock?.let { author ->
-                AlertDialog(
-                    onDismissRequest = { userToBlock = null },
-                    title = { Text("Block User?") },
-                    text = { Text("Do you want to add '@$author' to your blocked list?") },
-                    confirmButton = {
-                        Button(onClick = {
-                            viewModel.addBlacklistUser(author)
-                            userToBlock = null
-                        }) { Text("Block") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { userToBlock = null }) { Text("Cancel") }
-                    }
-                )
-            }
-
-            fullScreenFeedIndex?.let { startIndex ->
-                FullScreenFeedViewer(
-                    initialIndex = startIndex,
-                    viewModel = viewModel,
-                    autoReplay = autoReplay,
-                    onDismiss = { fullScreenFeedIndex = null }
-                )
-            }
+        fullScreenFeedIndex?.let { startIndex ->
+            FullScreenFeedViewer(
+                initialIndex = startIndex,
+                viewModel = viewModel,
+                autoReplay = autoReplay,
+                onDismiss = { fullScreenFeedIndex = null }
+            )
         }
     }
 }
@@ -421,7 +405,7 @@ fun FullScreenFeedViewer(
         ) {
             HorizontalPager(
                 state = pagerState,
-                beyondBoundsPageCount = 1,
+                beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager

@@ -25,7 +25,6 @@ fun ZoomableMediaViewer(
             .heightIn(min = 350.dp)
     }
 
-    // Telephoto handhabt Pinch-to-Zoom und Pager-Konflikte vollautomatisch intern!
     ZoomableAsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(url)
