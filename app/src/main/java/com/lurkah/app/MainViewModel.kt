@@ -253,7 +253,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsManager.setAutoPlayVideos(enabled) }
     }
 
-    fun toggleAutoPlay(enabled: Boolean) {
+    fun toggleAutoReplay(enabled: Boolean) { // <--- Hier umbenannt
         viewModelScope.launch { settingsManager.setAutoReplay(enabled) }
     }
 
