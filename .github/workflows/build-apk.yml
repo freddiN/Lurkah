@@ -47,7 +47,6 @@ jobs:
       - name: Verify signature
         run: jarsigner -verify -verbose -certs app/build/outputs/apk/release/lurkah.apk
 
-      # Pfad auf Release geändert
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
