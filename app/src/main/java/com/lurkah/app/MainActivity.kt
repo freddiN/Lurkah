@@ -289,8 +289,8 @@ fun SmartMediaCard(
     val currentOnClick by rememberUpdatedState(onClick)
     val context = LocalContext.current
 
-    val imageCount = post.images?.size ?: 1
-    val labelText = if (imageCount > 1 || post.isAlbum == true) {
+    val hasMultipleImages = (post.images?.size ?: 1) > 1
+    val labelText = if (post.isAlbum == true && hasMultipleImages) {
         "📁 ALBUM"
     } else {
         "${post.typeLabel} • ${post.formattedSize}"
@@ -399,7 +399,7 @@ fun FullScreenFeedViewer(
         currentPost?.let { post ->
             if (post.isAlbum == true || (post.images?.size ?: 1) > 1 || post.images.isNullOrEmpty()) {
                 delay(300)
-                viewModel.loadFullAlbumDetails(post.id)
+                viewModel.loadFullAlbumDetails(post.id, post) // Hier 'post' mit übergeben[cite: 26, 27]
             }
         }
 

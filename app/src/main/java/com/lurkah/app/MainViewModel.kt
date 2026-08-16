@@ -95,6 +95,10 @@ data class ImgurImage(
     val size: Long?
 )
 
+data class ImgurItemResponse(
+    val data: ImgurPost
+)
+
 interface ImgurApiService {
     @GET("3/gallery/hot/viral/{page}")
     suspend fun getMostViral(
@@ -107,6 +111,12 @@ interface ImgurApiService {
         @Header("Authorization") authHeader: String,
         @Path("id") albumId: String
     ): ImgurAlbumResponse
+
+    @GET("3/gallery/{id}")
+    suspend fun getGalleryItem(
+        @Header("Authorization") authHeader: String,
+        @Path("id") galleryId: String
+    ): ImgurItemResponse
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -220,14 +230,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadFullAlbumDetails(postId: String) {
+    fun loadFullAlbumDetails(postId: String, post: ImgurPost? = null) {
         if (albumImagesCache.containsKey(postId)) return
 
+        // 1. Wenn der Post im Feed bereits Bilder mitbringt, direkt cachen
+        if (!post?.images.isNullOrEmpty()) {
+            albumImagesCache[postId] = post!!.images!!
+            return
+        }
+
+        // 2. Ansonsten über den Gallery-Endpunkt nachladen
         viewModelScope.launch {
             try {
-                val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
-                if (response.success && !response.data.images.isNullOrEmpty()) {
-                    albumImagesCache[postId] = response.data.images
+                val response = api.getGalleryItem(authHeader = clientId, galleryId = postId)
+                if (!response.data.images.isNullOrEmpty()) {
+                    albumImagesCache[postId] = response.data.images!!
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
