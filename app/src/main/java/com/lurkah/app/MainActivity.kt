@@ -52,12 +52,6 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.unit.Dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -127,7 +121,7 @@ fun ImgurFeedScreen(
     var selectedPostIndex by remember { mutableStateOf<Int?>(null) }
     var fullScreenPostIndex by remember { mutableStateOf<Int?>(null) }
     var userToBlock by remember { mutableStateOf<String?>(null) }
-    var lastVideoPosition by remember { mutableStateOf(0L) }
+    var lastVideoPosition by remember { mutableLongStateOf(0L) }
 
     val gridState = rememberLazyGridState()
     val pullToRefreshState = rememberPullToRefreshState()
@@ -208,9 +202,9 @@ fun ImgurFeedScreen(
                     SmartMediaCard(
                         post = post,
                         onClick = { selectedPostIndex = index },
-                        onDoubleClick = { index, position ->
-                            lastVideoPosition = position // Position zwischenspeichern
-                            fullScreenPostIndex = index  // Nur für FullScreenMediaViewer setzen
+                        onDoubleClick = {
+                            lastVideoPosition = 0L
+                            fullScreenPostIndex = index
                         },
                         onAccountClick = { author -> userToBlock = author }
                     )
@@ -253,16 +247,14 @@ fun ImgurFeedScreen(
             }
 
             selectedPostIndex?.let { initialIndex ->
-                // Variable, um sich die aktuelle Videoposition im BottomSheet zu merken
-
                 PostDetailBottomSheet(
                     initialIndex = initialIndex,
                     viewModel = viewModel,
                     autoReplay = autoReplay,
                     onDismiss = { selectedPostIndex = null },
                     onDoubleClick = { index, position ->
-                        lastVideoPosition = position // Position zwischenspeichern
-                        fullScreenPostIndex = index  // Nur für FullScreenMediaViewer setzen
+                        lastVideoPosition = position
+                        fullScreenPostIndex = index
                     }
                 )
             }
@@ -272,7 +264,7 @@ fun ImgurFeedScreen(
                     initialIndex = initialIndex,
                     posts = viewModel.posts,
                     autoReplay = autoReplay,
-                    initialPlaybackPosition = lastVideoPosition, // Falls gewünscht übergeben
+                    initialPlaybackPosition = lastVideoPosition,
                     viewModel = viewModel,
                     onDismiss = { index ->
                         fullScreenPostIndex = null
@@ -295,7 +287,6 @@ fun SmartMediaCard(
     val currentOnDoubleClick by rememberUpdatedState(onDoubleClick)
     val context = LocalContext.current
 
-    // Ermitteln, ob es ein Album ist und wie viele Bilder es hat
     val imageCount = post.images?.size ?: 1
     val labelText = if (imageCount > 1) {
         "📁 ALBUM ($imageCount)"
@@ -393,7 +384,6 @@ fun FullScreenMediaViewer(
 ) {
     val safeInitialPage = initialIndex.coerceIn(0, (posts.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(initialPage = safeInitialPage, pageCount = { posts.size })
-
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
 
     Dialog(
@@ -412,7 +402,6 @@ fun FullScreenMediaViewer(
                 val post = posts.getOrNull(page) ?: return@HorizontalPager
                 val isCurrentPage = pagerState.currentPage == page
 
-                // Nutzen des Caches für Album-Bilder, falls vorhanden, sonst Fallback auf das initiale Post-Bild
                 val currentImages = viewModel.albumImagesCache[post.id] ?: post.images
 
                 var scale by remember { mutableFloatStateOf(1f) }
@@ -460,12 +449,12 @@ fun FullScreenMediaViewer(
                                     )
                                 )
                             } else {
-                                emptyList<ImgurImage>()
+                                emptyList()
                             }
 
                             rawList.map { img ->
                                 val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
-                                val fixedMp4 = img.mp4 ?: if (fixedLink.endswith(".mp4")) fixedLink else null
+                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
                                 img.copy(link = fixedLink, mp4 = fixedMp4)
                             }
                         }
@@ -473,19 +462,19 @@ fun FullScreenMediaViewer(
                         if (displayItems.isNotEmpty()) {
                             val firstImg = displayItems.first()
                             val itemUrl = firstImg.mp4 ?: firstImg.link
-                            val isItemVideo = (firstImg.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+                            val isItemVideo = (firstImg.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
-                            if (isItemVideo && itemUrl != null) {
+                            if (isItemVideo) {
                                 VideoPlayer(
                                     videoUrl = itemUrl,
                                     isMuted = false,
                                     autoReplay = autoReplay,
                                     autoPlayVideos = autoPlayVideos && isCurrentPage,
-                                    showControls = true,  // Für FullScreenMediaViewer: Controls sichtbar
+                                    showControls = true,
                                     startPositionMs = if (page == safeInitialPage) initialPlaybackPosition else 0L,
                                     modifier = Modifier.fillMaxSize()
                                 )
-                            } else if (itemUrl != null) {
+                            } else {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
                                         .data(itemUrl)
@@ -650,7 +639,7 @@ fun PostDetailBottomSheet(
                                 val shouldPlayVideo = isCurrentPage && albumPagerState.currentPage == albumPageIndex
 
                                 val itemUrl = img.mp4 ?: img.link
-                                val isItemVideo = (img.type ?? "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true || itemUrl?.endsWith(".gifv") == true
+                                val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4") || itemUrl.endsWith(".gifv")
 
                                 if (!isItemVideo) {
                                     val imageUrl = if (img.link.endsWith(".gifv")) {
@@ -767,8 +756,8 @@ fun VideoPlayer(
     autoReplay: Boolean,
     autoPlayVideos: Boolean,
     modifier: Modifier = Modifier,
-    showControls: Boolean = false,  // Nur wenn explizit gewünscht
-    startPositionMs: Long = 0L,   // Neu
+    showControls: Boolean = false,
+    startPositionMs: Long = 0L,
     onDoubleClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -777,7 +766,7 @@ fun VideoPlayer(
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
             if (startPositionMs > 0L) {
-                seekTo(startPositionMs) // Springt zur exakten Position beim Start
+                seekTo(startPositionMs)
             }
             prepare()
         }
@@ -786,7 +775,6 @@ fun VideoPlayer(
     LaunchedEffect(autoReplay, autoPlayVideos, isMuted) {
         exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         exoPlayer.volume = if (isMuted) 0f else 1f
-        // Nur autoplay wenn explizit aktiviert (nicht automatisch beim Start)
         exoPlayer.playWhenReady = autoPlayVideos && showControls || autoPlayVideos
     }
 
@@ -801,9 +789,8 @@ fun VideoPlayer(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
-                    // ✅ Controls werden nicht automatisch aktiviert (false)
                     useController = false
-                    controllerAutoShow = true  // ✅ Controls tauschen sich beim Touch ein/aus
+                    controllerAutoShow = true
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
@@ -844,9 +831,9 @@ fun DetailMediaItem(
     onPlayerReady: (ExoPlayer?) -> Unit
 ) {
     val itemUrl = img.mp4 ?: img.link
-    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl?.endsWith(".mp4") == true
+    val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
-    if (isItemVideo && itemUrl != null) {
+    if (isItemVideo) {
         val context = LocalContext.current
         var localPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
@@ -886,9 +873,8 @@ fun DetailMediaItem(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         player = exoPlayer
-                        // ✅ Controls werden nicht automatisch aktiviert (false)
                         useController = false
-                        controllerAutoShow = true  // ✅ Controls tauschen sich beim Touch ein/aus
+                        controllerAutoShow = true
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
@@ -916,7 +902,7 @@ fun DetailMediaItem(
                 modifier = Modifier.fillMaxSize()
             )
         }
-    } else if (itemUrl != null) {
+    } else {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(itemUrl)
