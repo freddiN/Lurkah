@@ -399,10 +399,12 @@ fun FullScreenFeedViewer(
     autoReplay: Boolean,
     onDismiss: () -> Unit
 ) {
-    // Interzeptiert die Zurück-Taste, um den Vollbild-Viewer zu schließen statt die App zu beenden
     BackHandler(enabled = true) {
         onDismiss()
     }
+
+    // NEU: Hält fest, ob gerade gezoomt wird, um das Scrollen zu blockieren
+    var isZoomed by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
@@ -435,6 +437,7 @@ fun FullScreenFeedViewer(
             HorizontalPager(
                 state = pagerState,
                 beyondBoundsPageCount = 1,
+                userScrollEnabled = !isZoomed, // GEFIXT: Pager-Swipe deaktivieren, wenn gezoomt
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val post = viewModel.posts.getOrNull(page) ?: return@HorizontalPager
@@ -477,6 +480,7 @@ fun FullScreenFeedViewer(
                         DetailMediaItem(
                             url = itemUrl,
                             isCurrentPage = isCurrentPage,
+                            isFirstItem = true,
                             autoReplay = autoReplay,
                             autoPlayVideos = autoPlayVideos,
                             modifier = Modifier.fillMaxSize()
@@ -486,12 +490,14 @@ fun FullScreenFeedViewer(
                             url = itemUrl,
                             contentDesc = post.title,
                             isFullScreen = true,
+                            onZoomChange = { isZoomed = it }, // NEU: Übergibt Zoom-Status
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = !isZoomed, // GEFIXT: Listen-Scroll deaktivieren, wenn gezoomt
                         contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp)
                     ) {
                         item {
@@ -511,6 +517,7 @@ fun FullScreenFeedViewer(
                                 DetailMediaItem(
                                     url = itemUrl,
                                     isCurrentPage = isCurrentPage,
+                                    isFirstItem = index == 0, // GEFIXT: Nur erstes Video spielt automatisch
                                     autoReplay = autoReplay,
                                     autoPlayVideos = autoPlayVideos,
                                     modifier = Modifier
@@ -523,6 +530,7 @@ fun FullScreenFeedViewer(
                                     url = if (itemUrl.endsWith(".gifv")) itemUrl.removeSuffix(".gifv") + ".jpg" else itemUrl,
                                     contentDesc = post.title,
                                     isFullScreen = false,
+                                    onZoomChange = { isZoomed = it }, // NEU
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 8.dp)
@@ -551,18 +559,24 @@ fun ZoomableImage(
     url: String,
     contentDesc: String,
     isFullScreen: Boolean = false,
+    onZoomChange: ((Boolean) -> Unit)? = null, // NEU: Callback für Zoom-Status
     modifier: Modifier = Modifier
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
+    // NEU: Informiert die Ebene darüber, wenn rein- oder rausgezoomt wird
+    LaunchedEffect(scale) {
+        onZoomChange?.invoke(scale > 1f)
+    }
+
     val baseModifier = if (isFullScreen) {
         modifier.fillMaxSize()
     } else {
         modifier
             .fillMaxWidth()
-            .heightIn(min = 250.dp, max = 500.dp)
+            .heightIn(min = 350.dp) // GEFIXT: Verhindert das Kollabieren von Bildern im Album
     }
 
     Box(
@@ -570,7 +584,6 @@ fun ZoomableImage(
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     val newScale = scale * zoom
-                    // Aktiviere Zoom-Offset nur, wenn gezoomt wurde
                     if (newScale > 1.05f || scale > 1f) {
                         scale = newScale.coerceIn(1f, 5f)
                         offsetX += pan.x
@@ -609,6 +622,7 @@ fun ZoomableImage(
 fun DetailMediaItem(
     url: String,
     isCurrentPage: Boolean,
+    isFirstItem: Boolean = true, // NEU: Bestimmt, ob es als erstes Album-Item sofort abspielen darf
     autoReplay: Boolean,
     autoPlayVideos: Boolean,
     modifier: Modifier = Modifier
@@ -622,13 +636,14 @@ fun DetailMediaItem(
         }
     }
 
-    LaunchedEffect(autoReplay, autoPlayVideos, isCurrentPage) {
+    // GEFIXT: Logik für Album-Videos
+    LaunchedEffect(autoReplay, autoPlayVideos, isCurrentPage, isFirstItem) {
         exoPlayer.repeatMode = if (autoReplay) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
 
-        // Steuert die Wiedergabe exakt nach Sichtbarkeit der Page:
-        exoPlayer.playWhenReady = autoPlayVideos && isCurrentPage
         if (!isCurrentPage) {
             exoPlayer.pause()
+        } else if (autoPlayVideos && isFirstItem) {
+            exoPlayer.playWhenReady = true
         }
     }
 
@@ -653,32 +668,9 @@ fun DetailMediaItem(
                     controllerShowTimeoutMs = 2500
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-
                     hideController()
-
-                    val gestureDetector = GestureDetector(
-                        ctx,
-                        object : GestureDetector.SimpleOnGestureListener() {
-                            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                                if (isControllerFullyVisible) {
-                                    hideController()
-                                } else {
-                                    showController()
-                                }
-                                return true
-                            }
-                        }
-                    )
-
-                    setOnTouchListener { v, event ->
-                        val handled = gestureDetector.onTouchEvent(event)
-                        if (event.action == MotionEvent.ACTION_UP && !handled) {
-                            v.performClick()
-                        }
-                        // Sobald gezwitschert/geswiped wird (MotionEvent.ACTION_MOVE), gibt der Detector false zurück.
-                        // Wir konsumieren das Event NICHT, damit der Pager swipen kann.
-                        handled
-                    }
+                    // GEFIXT: Der kaputte GestureDetector wurde hier komplett entfernt.
+                    // ExoPlayer verarbeitet einfache Klicks jetzt wieder fehlerfrei nativ.
                 }
             },
             update = { playerView ->
