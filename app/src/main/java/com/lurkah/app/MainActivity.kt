@@ -690,35 +690,14 @@ fun PostDetailBottomSheet(
                                         img.link
                                     }
 
-                                    var scale by remember { mutableFloatStateOf(1f) }
-                                    var offsetX by remember { mutableFloatStateOf(0f) }
-                                    var offsetY by remember { mutableFloatStateOf(0f) }
-
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .pointerInput(Unit) {
-                                                detectTransformGestures { _, pan, zoom, _ ->
-                                                    scale = (scale * zoom).coerceIn(1f, 5f)
-                                                    if (scale > 1f) {
-                                                        offsetX += pan.x
-                                                        offsetY += pan.y
-                                                    } else {
-                                                        offsetX = 0f
-                                                        offsetY = 0f
-                                                    }
-                                                }
-                                            }
-                                            .pointerInput(Unit) {
                                                 detectTapGestures(
                                                     onDoubleTap = {
-                                                        if (scale > 1f) {
-                                                            scale = 1f
-                                                            offsetX = 0f
-                                                            offsetY = 0f
-                                                        } else {
-                                                            scale = 2.5f
-                                                        }
+                                                        // Öffnet das Bild direkt im Vollbild-Viewer
+                                                        onDoubleClick(page, 0L)
                                                     }
                                                 )
                                             },
@@ -733,14 +712,7 @@ fun PostDetailBottomSheet(
                                                 .build(),
                                             contentDescription = post.title,
                                             contentScale = ContentScale.Fit,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .graphicsLayer(
-                                                    scaleX = scale,
-                                                    scaleY = scale,
-                                                    translationX = offsetX,
-                                                    translationY = offsetY
-                                                )
+                                            modifier = Modifier.fillMaxSize()
                                         )
                                     }
                                 } else {
@@ -874,8 +846,6 @@ fun VideoPlayer(
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
-                    hideController()
-
                     val gestureDetector = android.view.GestureDetector(
                         ctx,
                         object : android.view.GestureDetector.SimpleOnGestureListener() {
@@ -970,6 +940,9 @@ fun DetailMediaItem(
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
 
+                        // Erzwingt das Ausblenden beim Initialisieren
+                        hideController()
+
                         val gestureDetector = android.view.GestureDetector(
                             ctx,
                             object : android.view.GestureDetector.SimpleOnGestureListener() {
@@ -998,6 +971,7 @@ fun DetailMediaItem(
                 update = { playerView ->
                     if (playerView.player != exoPlayer) {
                         playerView.player = exoPlayer
+                        playerView.hideController()
                     }
                 },
                 modifier = Modifier.fillMaxSize()
