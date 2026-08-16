@@ -14,6 +14,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.material3.Player as Media3Player
+import androidx.core.net.toUri
 
 @Composable
 fun ComposeVideoPlayer(
@@ -27,7 +28,7 @@ fun ComposeVideoPlayer(
     val context = LocalContext.current
     val exoPlayer = remember(url, context) {
         ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+            setMediaItem(MediaItem.fromUri(url.toUri()))
             prepare()
         }
     }
@@ -42,7 +43,6 @@ fun ComposeVideoPlayer(
         }
     }
 
-    // FIX: exoPlayer als Key garantiert, dass genau diese Instanz aufgeräumt wird
     DisposableEffect(exoPlayer) {
         onDispose {
             exoPlayer.pause()

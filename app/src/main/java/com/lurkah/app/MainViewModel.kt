@@ -22,7 +22,6 @@ import retrofit2.http.Header
 import retrofit2.http.Path
 import java.util.Locale
 
-// --- DATA MODELS ---
 data class ImgurResponse(val data: List<ImgurPost>, val success: Boolean)
 
 data class ImgurAlbumResponse(val data: ImgurAlbumData, val success: Boolean)
@@ -37,18 +36,23 @@ data class ImgurPost(
     val size: Long?,
     val link: String?,
     val mp4: String?,
-    val type: String?
+    val type: String?,
+    @SerializedName("is_album") val isAlbum: Boolean?,
+    val cover: String?
 ) {
     val tags: List<String>
         get() = rawTags?.map { it.name } ?: emptyList()
 
     private val mainMedia: ImgurImage? get() = images?.firstOrNull()
 
+    val coverId: String
+        get() = cover ?: mainMedia?.id ?: id
+
     val mediaUrl: String?
         get() = mainMedia?.mp4 ?: mainMedia?.link ?: mp4 ?: link
 
     val thumbnailUrl: String
-        get() = "https://i.imgur.com/${mainMedia?.id ?: id}m.jpg"
+        get() = "https://i.imgur.com/${coverId}m.jpg"
 
     val isVideo: Boolean
         get() = (mainMedia?.type ?: type ?: "").startsWith("video/") || mediaUrl?.endsWith(".mp4") == true || mediaUrl?.endsWith(".gifv") == true
@@ -91,7 +95,6 @@ data class ImgurImage(
     val size: Long?
 )
 
-// --- API SERVICE ---
 interface ImgurApiService {
     @GET("3/gallery/hot/viral/{page}")
     suspend fun getMostViral(
@@ -152,7 +155,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val albumImagesCache = mutableStateMapOf<String, List<ImgurImage>>()
 
     init {
-        // FIX: Reagiert auf die DataStore-Flows und übernimmt auch das initiale Laden beim Start
         viewModelScope.launch {
             combine(blacklistedUsers, blacklistedTags) { users, tags ->
                 Pair(users, tags)
@@ -166,7 +168,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (isLoadingMore && !isRefresh) return
         if (isRefresh && isRefreshing) return
 
-        // FIX: Synchrones Setzen der Flags verhindert Race Conditions
         if (isRefresh) {
             isRefreshing = true
         } else {
@@ -189,7 +190,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         !currentBlacklist.contains(author) && !hasBlockedTag && post.mediaUrl != null
                     }
 
-                    // FIX: Liste erst nach erfolgreichem Fetch leeren (Kein Datenverlust bei Fehlern)
                     if (isRefresh) {
                         posts.clear()
                         currentPage = 0

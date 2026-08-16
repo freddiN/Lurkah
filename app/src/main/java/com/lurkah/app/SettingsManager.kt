@@ -58,7 +58,6 @@ class SettingsManager(private val context: Context) {
         }
     }
 
-    // FIX: Normalisierung auf lowercase schützt vor doppelten Einträgen
     suspend fun addBlacklistedUser(user: String) {
         val cleanUser = user.trim().removePrefix("@").lowercase()
         if (cleanUser.isBlank()) return
