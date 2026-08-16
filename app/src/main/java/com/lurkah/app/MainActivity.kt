@@ -644,29 +644,35 @@ fun PostDetailBottomSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(350.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)),
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         val cachedImages = viewModel.albumImagesCache[post.id]
-                        val rawList = when {
-                            !cachedImages.isNullOrEmpty() -> cachedImages
-                            !post.images.isNullOrEmpty() -> post.images
-                            post.mediaUrl != null -> listOf(
-                                ImgurImage(
-                                    id = post.id,
-                                    link = post.mediaUrl!!,
-                                    mp4 = if (post.isVideo) post.mediaUrl else null,
-                                    type = if (post.isVideo) "video/mp4" else "image/jpeg",
-                                    size = post.sizeInBytes
-                                )
-                            )
-                            else -> emptyList()
-                        }
 
-                        val displayItems = rawList.map { img ->
-                            val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
-                            val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
-                            img.copy(link = fixedLink, mp4 = fixedMp4)
+                        val displayItems = remember(cachedImages, post.images, post.mediaUrl) {
+                            val rawList = when {
+                                !cachedImages.isNullOrEmpty() -> cachedImages
+                                !post.images.isNullOrEmpty() -> post.images
+                                post.mediaUrl != null -> listOf(
+                                    ImgurImage(
+                                        id = post.id,
+                                        link = post.mediaUrl!!,
+                                        mp4 = if (post.isVideo) post.mediaUrl else null,
+                                        type = if (post.isVideo) "video/mp4" else "image/jpeg",
+                                        size = post.sizeInBytes
+                                    )
+                                )
+                                else -> emptyList()
+                            }
+
+                            rawList.map { img ->
+                                val fixedLink = if (img.link.endsWith(".gifv")) img.link.removeSuffix(".gifv") + ".mp4" else img.link
+                                val fixedMp4 = img.mp4 ?: if (fixedLink.endsWith(".mp4")) fixedLink else null
+                                img.copy(link = fixedLink, mp4 = fixedMp4)
+                            }
                         }
 
                         if (displayItems.isEmpty()) {
@@ -698,7 +704,6 @@ fun PostDetailBottomSheet(
                                             .pointerInput(Unit) {
                                                 detectTapGestures(
                                                     onDoubleTap = {
-                                                        // Öffnet das Bild analog zum Video im Vollbild
                                                         onDoubleClick(page, 0L)
                                                     }
                                                 )
@@ -708,6 +713,7 @@ fun PostDetailBottomSheet(
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalContext.current)
                                                 .data(imageUrl)
+                                                .placeholderMemoryCacheKey(post.thumbnailUrl)
                                                 .crossfade(true)
                                                 .diskCachePolicy(CachePolicy.ENABLED)
                                                 .memoryCachePolicy(CachePolicy.ENABLED)
