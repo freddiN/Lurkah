@@ -589,7 +589,7 @@ fun PostDetailBottomSheet(
     ) {
         HorizontalPager(
             state = pagerState,
-            beyondViewportPageCount = 1,
+            beyondBoundsPageCount = 1,
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
@@ -682,7 +682,7 @@ fun PostDetailBottomSheet(
 
                             HorizontalPager(
                                 state = albumPagerState,
-                                beyondViewportPageCount = 1,
+                                beyondBoundsPageCount = 1,
                                 modifier = Modifier.fillMaxSize()
                             ) { albumPageIndex ->
                                 val img = displayItems[albumPageIndex]
