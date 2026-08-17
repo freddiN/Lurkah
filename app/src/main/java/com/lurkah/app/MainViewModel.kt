@@ -193,6 +193,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (isRefresh) {
                         posts.clear()
+                        if (albumImagesCache.size > 50) {
+                            val keysToRemove = albumImagesCache.keys.take(albumImagesCache.size - 50)
+                            keysToRemove.forEach { key ->
+                                albumImagesCache.remove(key)
+                            }
+                        }
                         currentPage = 0
                     }
 
