@@ -83,4 +83,6 @@ dependencies {
     // Media3 ExoPlayer & Compose Material3 UI
     implementation("androidx.media3:media3-exoplayer:1.11.0")
     implementation("androidx.media3:media3-ui-compose-material3:1.11.0")
+
+    implementation("io.coil-kt:coil-gif:2.6.0")
 }
