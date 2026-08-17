@@ -59,6 +59,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.ui.text.style.TextOverflow
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -365,6 +366,16 @@ fun SmartMediaCard(
                 }
             }
 
+            // --- NEU: TITEL HIER EINBAUEN ---
+            Text(
+                text = post.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2, // Begrenzt auf max. 2 Zeilen für ein sauberes Layout
+                overflow = TextOverflow.Ellipsis, // Kürzt zu lange Titel mit "..." ab
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+
             post.accountUrl?.let { author ->
                 Text(
                     text = "@$author",
@@ -372,7 +383,7 @@ fun SmartMediaCard(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .padding(8.dp)
+                        .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
                         .clickable { onAccountClick(author) }
                 )
             }
@@ -406,13 +417,13 @@ fun FullScreenFeedViewer(
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             if (post.isAlbum == true || (post.images?.size ?: 1) > 1 || post.images.isNullOrEmpty()) {
-                delay(300)
+                //delay(300)
                 viewModel.loadFullAlbumDetails(post.id, post)
             }
         }
 
         if (pagerState.currentPage >= viewModel.posts.size - 3) {
-            delay(300)
+            //delay(300)
             viewModel.loadViralPosts(isRefresh = false)
         }
     }
