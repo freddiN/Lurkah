@@ -1,5 +1,6 @@
 package com.lurkah.app
 
+import android.os.Build
 import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import me.saket.telephoto.zoomable.coil.ZoomableAsyncImage
 
@@ -49,6 +52,13 @@ fun ZoomableMediaViewer(
     val imageRequest = remember(safeUrl) {
         ImageRequest.Builder(context)
             .data(safeUrl)
+            .decoderFactory(
+                if (Build.VERSION.SDK_INT >= 28) {
+                    ImageDecoderDecoder.Factory()
+                } else {
+                    GifDecoder.Factory()
+                }
+            )
             .crossfade(true)
             .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
             .listener(
@@ -59,16 +69,13 @@ fun ZoomableMediaViewer(
             .build()
     }
 
-    // Beide Ansichten nutzen jetzt ZoomableAsyncImage für volle Zoom-Funktionalität
     if (isFullScreen) {
-        // Hier bleibt das Bild voll zoombar
         ZoomableAsyncImage(
             model = imageRequest,
             contentDescription = contentDesc,
             modifier = modifier.fillMaxSize()
         )
     } else {
-        // In der Liste nutzen wir das normale AsyncImage zurück
         AsyncImage(
             model = imageRequest,
             contentDescription = contentDesc,
