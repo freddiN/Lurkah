@@ -62,6 +62,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -172,6 +174,7 @@ fun ImgurFeedScreen(
 
     val gridState = rememberLazyGridState()
     val pullToRefreshState = rememberPullToRefreshState()
+    val coroutineScope = rememberCoroutineScope()
 
     viewModel.errorMessage?.let { errorMsg ->
         AlertDialog(
@@ -201,7 +204,28 @@ fun ImgurFeedScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Lurkah") },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            coroutineScope.launch { gridState.animateScrollToItem(0) }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Visibility,
+                            contentDescription = "Lurkah Logo",
+                            tint = Color(0xFF1BB76E),
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Lurkah",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 22.sp,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                },
                 actions = {
                     IconButton(
                         onClick = { viewModel.loadViralPosts(isRefresh = true) }
