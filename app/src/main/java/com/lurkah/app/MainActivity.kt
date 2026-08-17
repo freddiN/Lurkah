@@ -172,6 +172,7 @@ fun ImgurFeedScreen(
 
     val gridState = rememberLazyGridState()
     val pullToRefreshState = rememberPullToRefreshState()
+    val coroutineScope = rememberCoroutineScope()
 
     viewModel.errorMessage?.let { errorMsg ->
         AlertDialog(
@@ -201,7 +202,17 @@ fun ImgurFeedScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Lurkah") },
+                title = {
+                    Text(
+                        text = "Lurkah",
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable {
+                            coroutineScope.launch {
+                                gridState.animateScrollToItem(0)
+                            }
+                        }
+                    )
+                },
                 actions = {
                     IconButton(
                         onClick = { viewModel.loadViralPosts(isRefresh = true) }
