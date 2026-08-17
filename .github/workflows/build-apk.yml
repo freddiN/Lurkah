@@ -38,6 +38,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: Lurkah-App-APK-Debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: |
+            app/build/outputs/apk/debug/*universal*.apk
           retention-days: 1
           if-no-files-found: error
