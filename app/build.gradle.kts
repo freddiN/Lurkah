@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.lurkah.app"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.lurkah.app"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
     }
