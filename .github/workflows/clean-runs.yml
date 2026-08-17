@@ -2,7 +2,7 @@ name: Clear Workflow Runs
 
 on:
   schedule:
-    - cron: "0 0 1 * *" # Läuft jeden 1. des Monats (oder via workflow_dispatch manuell)
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
@@ -17,5 +17,5 @@ jobs:
         with:
           token: ${{ github.token }}
           repository: ${{ github.repository }}
-          retain_days: 7
-          keep_minimum_runs: 2
+          retain_days: 2
+          keep_minimum_runs: 1

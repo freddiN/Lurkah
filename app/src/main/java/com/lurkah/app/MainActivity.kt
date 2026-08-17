@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -463,13 +462,11 @@ fun FullScreenFeedViewer(
         val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
         currentPost?.let { post ->
             if (post.isAlbum == true || (post.images?.size ?: 1) > 1 || post.images.isNullOrEmpty()) {
-                //delay(300)
                 viewModel.loadFullAlbumDetails(post.id, post)
             }
         }
 
         if (pagerState.currentPage >= viewModel.posts.size - 3) {
-            //delay(300)
             viewModel.loadViralPosts(isRefresh = false)
         }
     }
@@ -528,22 +525,40 @@ fun FullScreenFeedViewer(
                     val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
                     val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
-                    if (isItemVideo) {
-                        ComposeVideoPlayer(
-                            url = itemUrl,
-                            isCurrentPage = isCurrentPage,
-                            isFirstItem = true,
-                            autoReplay = autoReplay,
-                            autoPlayVideos = autoPlayVideos,
-                            modifier = Modifier.fillMaxSize()
+                    // Anpassung: In eine Column verpackt, um den Titel drüber anzuzeigen
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 16.dp, bottom = 64.dp)
+                    ) {
+                        Text(
+                            text = post.title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
-                    } else {
-                        ZoomableMediaViewer(
-                            url = itemUrl,
-                            contentDesc = post.title,
-                            isFullScreen = true,
-                            modifier = Modifier.fillMaxSize()
-                        )
+
+                        if (isItemVideo) {
+                            ComposeVideoPlayer(
+                                url = itemUrl,
+                                isCurrentPage = isCurrentPage,
+                                isFirstItem = true,
+                                autoReplay = autoReplay,
+                                autoPlayVideos = autoPlayVideos,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                            )
+                        } else {
+                            ZoomableMediaViewer(
+                                url = itemUrl,
+                                contentDesc = post.title,
+                                isFullScreen = true,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                            )
+                        }
                     }
                 } else {
                     LazyColumn(
@@ -560,7 +575,6 @@ fun FullScreenFeedViewer(
                         }
 
                         itemsIndexed(displayItems, key = { index, img -> "${img.id}_$index" }) { index, img ->
-                            // HIER KORRIGIERT: takeIf { !it.isNullOrBlank() }
                             val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
                             val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
@@ -604,7 +618,6 @@ fun FullScreenFeedViewer(
         }
 
         expandedAlbumImage?.let { img ->
-            // HIER KORRIGIERT: takeIf { !it.isNullOrBlank() }
             val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
 
             val coroutineScope = rememberCoroutineScope()

@@ -2,10 +2,12 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "master", "test" ]
-    tags:
-      - 'v*'
+    branches-ignore: [ "main" ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -16,41 +18,26 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '8.7'
+          cache-read-only: true
 
-      - name: Decode Keystore
-        run: |
-          echo -n "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
-
-      - name: Build Signed Release APK
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle assembleRelease
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --build-cache
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: Lurkah-App-APK
-          path: app/build/outputs/apk/release/*.apk
-
-      - name: Create Release and Upload Asset
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: app/build/outputs/apk/release/*.apk
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: Lurkah-App-APK-Debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 1
+          if-no-files-found: error
