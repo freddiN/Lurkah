@@ -60,6 +60,9 @@ import coil.request.ImageRequest
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -166,6 +169,7 @@ fun ImgurFeedScreen(
 ) {
     var fullScreenFeedIndex by remember { mutableStateOf<Int?>(null) }
     var userToBlock by remember { mutableStateOf<String?>(null) }
+    var tagToBlock by remember { mutableStateOf<String?>(null) }
 
     val gridState = rememberLazyGridState()
     val pullToRefreshState = rememberPullToRefreshState()
@@ -236,7 +240,8 @@ fun ImgurFeedScreen(
                     SmartMediaCard(
                         post = post,
                         onClick = { fullScreenFeedIndex = index },
-                        onAccountClick = { author -> userToBlock = author }
+                        onAccountClick = { author -> userToBlock = author },
+                        onTagClick = { tag -> tagToBlock = tag }
                     )
                 }
 
@@ -275,6 +280,23 @@ fun ImgurFeedScreen(
             )
         }
 
+        tagToBlock?.let { tag ->
+            AlertDialog(
+                onDismissRequest = { tagToBlock = null },
+                title = { Text("Block Tag?") },
+                text = { Text("Do you want to add '#$tag' to your blocked list? Posts with this tag will be hidden.") },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.addBlacklistTag(tag)
+                        tagToBlock = null
+                    }) { Text("Block") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { tagToBlock = null }) { Text("Cancel") }
+                }
+            )
+        }
+
         fullScreenFeedIndex?.let { startIndex ->
             FullScreenFeedViewer(
                 initialIndex = startIndex,
@@ -291,7 +313,8 @@ fun ImgurFeedScreen(
 fun SmartMediaCard(
     post: ImgurPost,
     onClick: () -> Unit,
-    onAccountClick: (String) -> Unit
+    onAccountClick: (String) -> Unit,
+    onTagClick: (String) -> Unit
 ) {
     val currentOnClick by rememberUpdatedState(onClick)
     val context = LocalContext.current
@@ -366,13 +389,12 @@ fun SmartMediaCard(
                 }
             }
 
-            // --- NEU: TITEL HIER EINBAUEN ---
             Text(
                 text = post.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2, // Begrenzt auf max. 2 Zeilen für ein sauberes Layout
-                overflow = TextOverflow.Ellipsis, // Kürzt zu lange Titel mit "..." ab
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
 
@@ -383,9 +405,33 @@ fun SmartMediaCard(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
+                        .padding(start = 8.dp, end = 8.dp, bottom = 4.dp)
                         .clickable { onAccountClick(author) }
                 )
+            }
+
+            if (post.tags.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(post.tags) { tag ->
+                        Text(
+                            text = "#$tag",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier
+                                .background(
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                                .clickable { onTagClick(tag) }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
         }
     }
