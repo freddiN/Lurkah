@@ -47,7 +47,7 @@ jobs:
         with:
           name: Lurkah-App-APK-Release
           path: app/build/outputs/apk/release/*.apk
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error
 
       - name: Create Release and Upload Asset
