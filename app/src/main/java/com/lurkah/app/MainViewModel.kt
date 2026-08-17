@@ -225,17 +225,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val totalCount = post?.imagesCount ?: post?.images?.size ?: 0
         val cachedCount = albumImagesCache[postId]?.size ?: 0
 
-        // Wenn bereits alle Bilder im Cache liegen, kein Re-Fetch nötig
         if (albumImagesCache.containsKey(postId) && cachedCount >= totalCount && totalCount > 0) {
             return
         }
 
         viewModelScope.launch {
             try {
-                // Ruft den echten Album-Endpunkt (3/album/{id}) auf, der ALLE Bilder liefert
                 val response = api.getAlbumDetails(authHeader = clientId, albumId = postId)
                 if (response.success && !response.data.images.isNullOrEmpty()) {
-                    albumImagesCache[postId] = response.data.images!!
+                    albumImagesCache[postId] = response.data.images
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

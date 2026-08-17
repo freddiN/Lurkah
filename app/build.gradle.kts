@@ -68,10 +68,8 @@ dependencies {
     // Coil (Bilder & GIFs)
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
-    implementation("io.coil-kt:coil-gif:2.7.0")
 
     // Media3 ExoPlayer (Video)
-    implementation("androidx.media3:media3-exoplayer:1.11.0")
     implementation("androidx.media3:media3-ui:1.11.0")
 
     implementation("androidx.datastore:datastore-preferences:1.2.1")
