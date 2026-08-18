@@ -230,10 +230,18 @@ fun ImgurFeedScreen(
                     IconButton(
                         onClick = { viewModel.loadViralPosts(isRefresh = true) }
                     ) {
-                        Text("↻", fontSize = 18.sp)
+                        Text(
+                            text = "↻",
+                            fontSize = 18.sp,
+                            color = Color(0xFF1BB76E)
+                        )
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Text("⚙️", fontSize = 18.sp)
+                        Text(
+                            text = "⚙",
+                            fontSize = 18.sp,
+                            color = Color(0xFF1BB76E)
+                        )
                     }
                 }
             )
