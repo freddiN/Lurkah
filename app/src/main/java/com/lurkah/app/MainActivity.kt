@@ -344,7 +344,7 @@ fun SmartMediaCard(
 
     val totalCount = post.imagesCount ?: post.images?.size ?: 1
     val labelText = if (post.isAlbum == true && totalCount > 1) {
-        "📁 ALBUM ($totalCount)"
+        "📁 ALBUM ($totalCount) • ${post.formattedSize}"
     } else {
         "${post.typeLabel} • ${post.formattedSize}"
     }

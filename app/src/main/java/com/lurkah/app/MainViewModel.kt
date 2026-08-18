@@ -62,7 +62,13 @@ data class ImgurPost(
         get() = mainMedia?.type == "image/gif" || type == "image/gif" || mediaUrl?.endsWith(".gif") == true
 
     val sizeInBytes: Long
-        get() = mainMedia?.size ?: size ?: 0L
+        get() = if (isAlbum == true && !images.isNullOrEmpty()) {
+            // Bei Alben addieren wir die Größe aller vorhandenen Bilder
+            images.sumOf { it.size ?: 0L }
+        } else {
+            // Bei Einzelposts bleibt die bisherige Logik
+            mainMedia?.size ?: size ?: 0L
+        }
 
     val formattedSize: String
         get() {
