@@ -79,7 +79,7 @@ fun ZoomableMediaViewer(
         AsyncImage(
             model = imageRequest,
             contentDescription = contentDesc,
-            contentScale = ContentScale.Inside,
+            contentScale = ContentScale.FillWidth,
             modifier = modifier
                 .fillMaxWidth()
                 .heightIn(min = 200.dp, max = 800.dp)
