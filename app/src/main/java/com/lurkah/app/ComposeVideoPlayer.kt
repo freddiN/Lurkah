@@ -1,6 +1,5 @@
 package com.lurkah.app
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -14,6 +13,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.material3.Player as Media3Player
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 
 @Composable
 fun ComposeVideoPlayer(
@@ -51,8 +52,16 @@ fun ComposeVideoPlayer(
     }
 
     Box(
-        modifier = modifier.clickable {
-            exoPlayer.playWhenReady = !exoPlayer.playWhenReady
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onTap = {
+                    exoPlayer.playWhenReady = !exoPlayer.playWhenReady
+                },
+                onDoubleTap = {
+                    exoPlayer.seekTo(0)
+                    exoPlayer.playWhenReady = true
+                }
+            )
         }
     ) {
         Media3Player(

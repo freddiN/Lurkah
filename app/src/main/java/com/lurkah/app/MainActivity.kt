@@ -230,10 +230,18 @@ fun ImgurFeedScreen(
                     IconButton(
                         onClick = { viewModel.loadViralPosts(isRefresh = true) }
                     ) {
-                        Text("↻", fontSize = 18.sp)
+                        Text(
+                            text = "↻",
+                            fontSize = 18.sp,
+                            color = Color(0xFF1BB76E)
+                        )
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Text("⚙️", fontSize = 18.sp)
+                        Text(
+                            text = "⚙",
+                            fontSize = 18.sp,
+                            color = Color(0xFF1BB76E)
+                        )
                     }
                 }
             )
@@ -344,7 +352,7 @@ fun SmartMediaCard(
 
     val totalCount = post.imagesCount ?: post.images?.size ?: 1
     val labelText = if (post.isAlbum == true && totalCount > 1) {
-        "📁 ALBUM ($totalCount)"
+        "📁 ALBUM ($totalCount) • ${post.formattedSize}"
     } else {
         "${post.typeLabel} • ${post.formattedSize}"
     }
@@ -602,27 +610,39 @@ fun FullScreenFeedViewer(
                             val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
                             val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
-                            if (isItemVideo) {
-                                ComposeVideoPlayer(
-                                    url = itemUrl,
-                                    isCurrentPage = isCurrentPage,
-                                    isFirstItem = index == 0,
-                                    autoReplay = autoReplay,
-                                    autoPlayVideos = autoPlayVideos,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(350.dp)
-                                        .padding(vertical = 8.dp)
-                                )
-                            } else {
-                                ZoomableMediaViewer(
-                                    url = itemUrl,
-                                    contentDesc = post.title,
-                                    isFullScreen = false,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp)
-                                        .clickable { expandedAlbumImage = img }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (isItemVideo) {
+                                    ComposeVideoPlayer(
+                                        url = itemUrl,
+                                        isCurrentPage = isCurrentPage,
+                                        isFirstItem = index == 0,
+                                        autoReplay = autoReplay,
+                                        autoPlayVideos = autoPlayVideos,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(350.dp)
+                                    )
+                                } else {
+                                    ZoomableMediaViewer(
+                                        url = itemUrl,
+                                        contentDesc = post.title,
+                                        isFullScreen = false,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { expandedAlbumImage = img }
+                                    )
+                                }
+
+                                Text(
+                                    text = "${index + 1} / ${displayItems.size}",
+                                    color = Color.LightGray,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.padding(top = 8.dp)
                                 )
                             }
                         }

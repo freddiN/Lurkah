@@ -31,14 +31,22 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --build-cache
+      - name: Decode Keystore
+        run: |
+          echo -n "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
+
+      - name: Build Signed Release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --build-cache
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Lurkah-App-APK-Debug
+          name: Lurkah-App-APK-Release
           path: |
-            app/build/outputs/apk/debug/*universal*.apk
+            app/build/outputs/apk/release/*universal*.apk
           retention-days: 1
           if-no-files-found: error
