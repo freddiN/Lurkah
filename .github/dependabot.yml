@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Prüft deine Gradle-Abhängigkeiten (Android / Kotlin)
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly" # Optionen: "daily", "weekly", "monthly"
+
+  # Prüft deine GitHub Actions Workflows (optional)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
