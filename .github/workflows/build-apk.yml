@@ -32,10 +32,12 @@ jobs:
           cache-read-only: true
 
       - name: Decode Keystore
+        if: github.actor != 'dependabot[bot]'
         run: |
           echo -n "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
 
       - name: Build Signed Release APK
+        if: github.actor != 'dependabot[bot]'
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -43,6 +45,7 @@ jobs:
         run: ./gradlew assembleRelease --build-cache
 
       - name: Upload APK Artifact
+        if: github.actor != 'dependabot[bot]'
         uses: actions/upload-artifact@v7
         with:
           name: Lurkah-App-APK-Release
@@ -50,3 +53,7 @@ jobs:
             app/build/outputs/apk/release/*universal*.apk
           retention-days: 1
           if-no-files-found: error
+
+      - name: Build Debug APK (Dependabot)
+        if: github.actor == 'dependabot[bot]'
+        run: ./gradlew assembleDebug --build-cache
