@@ -557,7 +557,6 @@ fun FullScreenFeedViewer(
                     val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
                     val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
 
-                    // Anpassung: In eine Column verpackt, um den Titel drüber anzuzeigen
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -609,6 +608,13 @@ fun FullScreenFeedViewer(
                         itemsIndexed(displayItems, key = { index, img -> "${img.id}_$index" }) { index, img ->
                             val itemUrl = img.mp4.takeIf { !it.isNullOrBlank() } ?: img.link
                             val isItemVideo = (img.type ?: "").startsWith("video/") || itemUrl.endsWith(".mp4")
+                            val isItemGif = img.type == "image/gif" || itemUrl.endsWith(".gif")
+
+                            val itemTypeLabel = when {
+                                isItemVideo -> "🎥 MP4"
+                                isItemGif -> "🎞️ GIF"
+                                else -> "🖼️ IMAGE"
+                            }
 
                             Column(
                                 modifier = Modifier
@@ -625,7 +631,7 @@ fun FullScreenFeedViewer(
                                         autoPlayVideos = autoPlayVideos,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(350.dp)
+                                            .heightIn(min = 200.dp, max = 800.dp)
                                     )
                                 } else {
                                     ZoomableMediaViewer(
@@ -639,7 +645,7 @@ fun FullScreenFeedViewer(
                                 }
 
                                 Text(
-                                    text = "${index + 1} / ${displayItems.size}",
+                                    text = "${index + 1} / ${displayItems.size} • $itemTypeLabel",
                                     color = Color.LightGray,
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier = Modifier.padding(top = 8.dp)
