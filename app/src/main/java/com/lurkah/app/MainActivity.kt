@@ -514,7 +514,7 @@ fun FullScreenFeedViewer(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false)
     ) {
         Box(
             modifier = Modifier
@@ -581,7 +581,7 @@ fun FullScreenFeedViewer(
                         if (isItemVideo) {
                             ComposeVideoPlayer(
                                 url = itemUrl,
-                                isCurrentPage = isCurrentPage,
+                                        isCurrentPage = isCurrentPage && !showComments,
                                 isFirstItem = true,
                                 autoReplay = autoReplay,
                                 autoPlayVideos = autoPlayVideos,
@@ -634,7 +634,7 @@ fun FullScreenFeedViewer(
                                 if (isItemVideo) {
                                     ComposeVideoPlayer(
                                         url = itemUrl,
-                                        isCurrentPage = isCurrentPage,
+                                isCurrentPage = isCurrentPage && !showComments,
                                         isFirstItem = index == 0,
                                         autoReplay = autoReplay,
                                         autoPlayVideos = autoPlayVideos,
