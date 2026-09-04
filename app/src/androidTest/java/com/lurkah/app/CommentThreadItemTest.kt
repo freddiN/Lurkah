@@ -29,7 +29,7 @@ class CommentThreadItemTest {
     @Test
     fun commentThread_rendersParentAndChild() {
         composeTestRule.setContent {
-            CommentThreadItem(comment = sampleThread(), depth = 0)
+            CommentThreadItem(comment = sampleThread(), depth = 0, onMediaClick = {}, onExternalLinkClick = {})
         }
 
         composeTestRule.onNodeWithText("Top comment").assertIsDisplayed()
@@ -41,7 +41,7 @@ class CommentThreadItemTest {
     @Test
     fun commentThread_collapseHidesReplies() {
         composeTestRule.setContent {
-            CommentThreadItem(comment = sampleThread(), depth = 0)
+            CommentThreadItem(comment = sampleThread(), depth = 0, onMediaClick = {}, onExternalLinkClick = {})
         }
 
         // Replies sind initial sichtbar (expanded = true)
@@ -64,7 +64,7 @@ class CommentThreadItemTest {
         )
 
         composeTestRule.setContent {
-            CommentThreadItem(comment = leaf, depth = 0)
+            CommentThreadItem(comment = leaf, depth = 0, onMediaClick = {}, onExternalLinkClick = {})
         }
 
         composeTestRule.onNodeWithText("Lonely comment").assertIsDisplayed()
@@ -75,10 +75,49 @@ class CommentThreadItemTest {
     @Test
     fun commentThread_showsPoints() {
         composeTestRule.setContent {
-            CommentThreadItem(comment = sampleThread(), depth = 0)
+            CommentThreadItem(comment = sampleThread(), depth = 0, onMediaClick = {}, onExternalLinkClick = {})
         }
 
         // points 9.0 -> "▲ 9"
         composeTestRule.onNodeWithText("▲ 9").assertIsDisplayed()
+    }
+
+    @Test
+    fun commentThread_rendersImgurLink() {
+        val withLink = ImgurComment(
+            id = 4, imageId = "abc", comment = "Look https://i.imgur.com/test.jpg nice",
+            author = "linker", ups = 1, downs = 0, points = 1.0,
+            datetime = 1, parentId = 0, deleted = false,
+            children = emptyList()
+        )
+
+        composeTestRule.setContent {
+            CommentThreadItem(comment = withLink, depth = 0, onMediaClick = {}, onExternalLinkClick = {})
+        }
+
+        composeTestRule.onNodeWithText("Look https://i.imgur.com/test.jpg nice", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun commentThread_clickMediaLink_triggersCallback() {
+        var clickedUrl: String? = null
+        val withLink = ImgurComment(
+            id = 5, imageId = "abc", comment = "Video https://i.imgur.com/test.mp4 here",
+            author = "linker", ups = 1, downs = 0, points = 1.0,
+            datetime = 1, parentId = 0, deleted = false,
+            children = emptyList()
+        )
+
+        composeTestRule.setContent {
+            CommentThreadItem(
+                comment = withLink, depth = 0,
+                onMediaClick = { clickedUrl = it },
+                onExternalLinkClick = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("Video https://i.imgur.com/test.mp4 here", substring = true).performClick()
+
+        assert(clickedUrl == "https://i.imgur.com/test.mp4") { "Expected media callback, got $clickedUrl" }
     }
 }
