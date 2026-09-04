@@ -479,10 +479,6 @@ fun FullScreenFeedViewer(
     var expandedAlbumImage by remember { mutableStateOf<ImgurImage?>(null) }
     var showComments by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = true) {
-        if (showComments) showComments = false else onDismiss()
-    }
-
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
         pageCount = { viewModel.posts.size }
@@ -521,6 +517,9 @@ fun FullScreenFeedViewer(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
+            BackHandler(enabled = true) {
+                if (showComments) showComments = false else onDismiss()
+            }
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 0,
