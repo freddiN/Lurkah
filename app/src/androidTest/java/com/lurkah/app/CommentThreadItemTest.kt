@@ -120,4 +120,50 @@ class CommentThreadItemTest {
 
         assert(clickedUrl == "https://i.imgur.com/test.mp4") { "Expected media callback, got $clickedUrl" }
     }
+
+    @Test
+    fun commentThread_clickGiphyLink_triggersMediaCallback() {
+        var clickedUrl: String? = null
+        val withLink = ImgurComment(
+            id = 6, imageId = "abc", comment = "Giphy https://media.giphy.com/media/abc123/giphy.gif lol",
+            author = "linker", ups = 1, downs = 0, points = 1.0,
+            datetime = 1, parentId = 0, deleted = false,
+            children = emptyList()
+        )
+
+        composeTestRule.setContent {
+            CommentThreadItem(
+                comment = withLink, depth = 0,
+                onMediaClick = { clickedUrl = it },
+                onExternalLinkClick = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("Giphy https://media.giphy.com/media/abc123/giphy.gif lol", substring = true).performClick()
+
+        assert(clickedUrl == "https://media.giphy.com/media/abc123/giphy.gif") { "Expected media callback, got $clickedUrl" }
+    }
+
+    @Test
+    fun commentThread_clickGiphyPageLink_triggersExternalCallback() {
+        var externalUrl: String? = null
+        val withLink = ImgurComment(
+            id = 7, imageId = "abc", comment = "See https://giphy.com/gifs/funny-cat-abc123",
+            author = "linker", ups = 1, downs = 0, points = 1.0,
+            datetime = 1, parentId = 0, deleted = false,
+            children = emptyList()
+        )
+
+        composeTestRule.setContent {
+            CommentThreadItem(
+                comment = withLink, depth = 0,
+                onMediaClick = {},
+                onExternalLinkClick = { externalUrl = it }
+            )
+        }
+
+        composeTestRule.onNodeWithText("See https://giphy.com/gifs/funny-cat-abc123", substring = true).performClick()
+
+        assert(externalUrl == "https://giphy.com/gifs/funny-cat-abc123") { "Expected external callback, got $externalUrl" }
+    }
 }
