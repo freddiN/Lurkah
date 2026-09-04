@@ -481,6 +481,7 @@ fun FullScreenFeedViewer(
     }
 
     var expandedAlbumImage by remember { mutableStateOf<ImgurImage?>(null) }
+    var showComments by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
@@ -500,6 +501,14 @@ fun FullScreenFeedViewer(
 
         if (pagerState.currentPage >= viewModel.posts.size - 3) {
             viewModel.loadViralPosts(isRefresh = false)
+        }
+    }
+
+    LaunchedEffect(showComments, pagerState.currentPage) {
+        if (showComments) {
+            viewModel.posts.getOrNull(pagerState.currentPage)?.let { post ->
+                viewModel.loadGalleryComments(post.id, sort = "new")
+            }
         }
     }
 
@@ -656,14 +665,60 @@ fun FullScreenFeedViewer(
                 }
             }
 
-            IconButton(
-                onClick = onDismiss,
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(24.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+                    .padding(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                IconButton(
+                    onClick = {
+                        showComments = !showComments
+                        if (showComments) {
+                            viewModel.posts.getOrNull(pagerState.currentPage)?.let { post ->
+                                viewModel.loadGalleryComments(post.id, sort = "new")
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .background(
+                            if (showComments) Color(0xFF1BB76E).copy(alpha = 0.8f)
+                            else Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(50)
+                        )
+                ) {
+                    Text(
+                        text = if (showComments) "🖼️" else "💬",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+                ) {
+                    Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            if (showComments) {
+                val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .padding(top = 88.dp)
+                ) {
+                    currentPost?.let { post ->
+                        CommentsToggleView(
+                            postId = post.id,
+                            postTitle = post.title,
+                            viewModel = viewModel
+                        )
+                    }
+                }
             }
         }
 
@@ -721,6 +776,137 @@ fun FullScreenFeedViewer(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun CommentsToggleView(
+    postId: String,
+    postTitle: String,
+    viewModel: MainViewModel
+) {
+    val comments = viewModel.commentsCache[postId]
+    val isLoading = viewModel.commentsLoading[postId] == true
+    val error = viewModel.commentsError[postId]
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(horizontal = 16.dp)
+    ) {
+        Text(
+            text = postTitle,
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        Text(
+            text = "💬 Comments (new first)",
+            color = Color(0xFF1BB76E),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        when {
+            isLoading && comments == null -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
+            error != null && comments == null -> {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(text = error, color = Color.LightGray)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = { viewModel.loadGalleryComments(postId, sort = "new", forceRefresh = true) }) {
+                        Text("Retry")
+                    }
+                }
+            }
+            comments.isNullOrEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(text = "No comments yet.", color = Color.Gray)
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(comments, key = { it.id }) { comment ->
+                        CommentThreadItem(comment = comment, depth = 0)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CommentThreadItem(comment: ImgurComment, depth: Int) {
+    var expanded by remember { mutableStateOf(true) }
+    val childCount = comment.children?.size ?: 0
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 12).dp)
+            .background(
+                color = Color.White.copy(alpha = 0.07f),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "@${comment.author ?: "unknown"}",
+                color = Color(0xFF1BB76E),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "▲ ${comment.points?.toInt() ?: (comment.ups ?: 0)}",
+                color = Color.Gray,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = comment.comment ?: "",
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        if (childCount > 0) {
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) "Hide $childCount replies" else "Show $childCount replies",
+                    color = Color(0xFF1BB76E),
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+
+    if (expanded && !comment.children.isNullOrEmpty()) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            comment.children.forEach { child ->
+                CommentThreadItem(comment = child, depth = depth + 1)
             }
         }
     }
