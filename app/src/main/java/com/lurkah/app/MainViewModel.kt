@@ -279,7 +279,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadGalleryComments(galleryId: String, sort: String = "new", forceRefresh: Boolean = false) {
+    fun loadGalleryComments(galleryId: String, sort: String = "best", forceRefresh: Boolean = false) {
         if (commentsLoading[galleryId] == true) return
         if (!forceRefresh && commentsCache.containsKey(galleryId)) return
 

@@ -476,12 +476,12 @@ fun FullScreenFeedViewer(
     gridState: LazyGridState,
     onDismiss: () -> Unit
 ) {
-    BackHandler(enabled = true) {
-        onDismiss()
-    }
-
     var expandedAlbumImage by remember { mutableStateOf<ImgurImage?>(null) }
     var showComments by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = true) {
+        if (showComments) showComments = false else onDismiss()
+    }
 
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
@@ -507,7 +507,7 @@ fun FullScreenFeedViewer(
     LaunchedEffect(showComments, pagerState.currentPage) {
         if (showComments) {
             viewModel.posts.getOrNull(pagerState.currentPage)?.let { post ->
-                viewModel.loadGalleryComments(post.id, sort = "new")
+                viewModel.loadGalleryComments(post.id, sort = "best")
             }
         }
     }
@@ -665,6 +665,24 @@ fun FullScreenFeedViewer(
                 }
             }
 
+            if (showComments) {
+                val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .padding(top = 88.dp)
+                ) {
+                    currentPost?.let { post ->
+                        CommentsToggleView(
+                            postId = post.id,
+                            postTitle = post.title,
+                            viewModel = viewModel
+                        )
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -676,7 +694,7 @@ fun FullScreenFeedViewer(
                         showComments = !showComments
                         if (showComments) {
                             viewModel.posts.getOrNull(pagerState.currentPage)?.let { post ->
-                                viewModel.loadGalleryComments(post.id, sort = "new")
+                                viewModel.loadGalleryComments(post.id, sort = "best")
                             }
                         }
                     },
@@ -700,24 +718,6 @@ fun FullScreenFeedViewer(
                         .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
                 ) {
                     Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            if (showComments) {
-                val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black)
-                        .padding(top = 88.dp)
-                ) {
-                    currentPost?.let { post ->
-                        CommentsToggleView(
-                            postId = post.id,
-                            postTitle = post.title,
-                            viewModel = viewModel
-                        )
-                    }
                 }
             }
         }
@@ -807,7 +807,7 @@ fun CommentsToggleView(
             modifier = Modifier.padding(vertical = 8.dp)
         )
         Text(
-            text = "💬 Comments (new first)",
+            text = "💬 Comments (best first)",
             color = Color(0xFF1BB76E),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -827,7 +827,7 @@ fun CommentsToggleView(
                 ) {
                     Text(text = error, color = Color.LightGray)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = { viewModel.loadGalleryComments(postId, sort = "new", forceRefresh = true) }) {
+                    Button(onClick = { viewModel.loadGalleryComments(postId, sort = "best", forceRefresh = true) }) {
                         Text("Retry")
                     }
                 }
