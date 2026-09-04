@@ -8,3 +8,4 @@ features:
 - double tap to zoom images
 - swipe left/right to navigate the feed
 - configure video autoplay (start when opening) and replay (loop)
+- optionally display comments
