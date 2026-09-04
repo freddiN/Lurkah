@@ -799,7 +799,8 @@ fun FullScreenFeedViewer(
             }
         }
 
-        commentPreviewUrl?.let { url ->
+        commentPreviewUrl?.let { rawUrl ->
+            val url = normalizeCommentMediaUrl(rawUrl)
             Dialog(
                 onDismissRequest = { commentPreviewUrl = null },
                 properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
@@ -1002,6 +1003,11 @@ private fun isDirectCommentVideo(url: String) =
 
 private fun isDirectCommentImage(url: String) =
     listOf(".jpg", ".jpeg", ".png", ".gif", ".webp").any { url.endsWith(it, ignoreCase = true) }
+
+internal fun normalizeCommentMediaUrl(url: String): String =
+    if (url.contains("giphy.com", ignoreCase = true) && url.endsWith(".webp", ignoreCase = true))
+        url.dropLast(".webp".length) + ".mp4"
+    else url
 
 @Composable
 fun CommentRichText(
