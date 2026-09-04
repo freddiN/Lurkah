@@ -990,9 +990,9 @@ fun CommentThreadItem(
     }
 }
 
-private val MediaUrlRegex = Regex("""https?://(?:(?:i\.)?imgur\.com|(?:media\.|i\.)?giphy\.com|giphy\.com)/\S+""")
+private val MediaUrlRegex = Regex("""https?://[^\s/]*?(imgur\.com|giphy\.com)/\S+""")
 
-private fun extractMediaUrls(text: String): List<String> =
+internal fun extractMediaUrls(text: String): List<String> =
     MediaUrlRegex.findAll(text)
         .map { it.value.trimEnd('.', ',', ')', '!', '?') }
         .distinct().toList()
