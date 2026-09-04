@@ -6,6 +6,7 @@
 
 package com.lurkah.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -15,6 +16,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
@@ -44,7 +47,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -52,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -476,11 +483,10 @@ fun FullScreenFeedViewer(
     gridState: LazyGridState,
     onDismiss: () -> Unit
 ) {
-    BackHandler(enabled = true) {
-        onDismiss()
-    }
-
     var expandedAlbumImage by remember { mutableStateOf<ImgurImage?>(null) }
+    var showComments by remember { mutableStateOf(false) }
+    var commentPreviewUrl by remember { mutableStateOf<String?>(null) }
+    val viewerContext = LocalContext.current
 
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, (viewModel.posts.size - 1).coerceAtLeast(0)),
@@ -503,15 +509,26 @@ fun FullScreenFeedViewer(
         }
     }
 
+    LaunchedEffect(showComments, pagerState.currentPage) {
+        if (showComments) {
+            viewModel.posts.getOrNull(pagerState.currentPage)?.let { post ->
+                viewModel.loadGalleryComments(post.id, sort = "best")
+            }
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
+            BackHandler(enabled = true) {
+                if (showComments) showComments = false else onDismiss()
+            }
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 0,
@@ -572,7 +589,7 @@ fun FullScreenFeedViewer(
                         if (isItemVideo) {
                             ComposeVideoPlayer(
                                 url = itemUrl,
-                                isCurrentPage = isCurrentPage,
+                                        isCurrentPage = isCurrentPage && !showComments,
                                 isFirstItem = true,
                                 autoReplay = autoReplay,
                                 autoPlayVideos = autoPlayVideos,
@@ -625,7 +642,7 @@ fun FullScreenFeedViewer(
                                 if (isItemVideo) {
                                     ComposeVideoPlayer(
                                         url = itemUrl,
-                                        isCurrentPage = isCurrentPage,
+                                isCurrentPage = isCurrentPage && !showComments,
                                         isFirstItem = index == 0,
                                         autoReplay = autoReplay,
                                         autoPlayVideos = autoPlayVideos,
@@ -656,14 +673,72 @@ fun FullScreenFeedViewer(
                 }
             }
 
-            IconButton(
-                onClick = onDismiss,
+            if (showComments) {
+                val currentPost = viewModel.posts.getOrNull(pagerState.currentPage)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .padding(top = 88.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {}
+                        )
+                ) {
+                    currentPost?.let { post ->
+                        CommentsToggleView(
+                            postId = post.id,
+                            postTitle = post.title,
+                            viewModel = viewModel,
+                            onMediaClick = { url -> commentPreviewUrl = url },
+                            onExternalLinkClick = { url ->
+                                try {
+                                    viewerContext.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                                } catch (_: Exception) {
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(24.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+                    .padding(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                IconButton(
+                    onClick = {
+                        showComments = !showComments
+                        if (showComments) {
+                            viewModel.posts.getOrNull(pagerState.currentPage)?.let { post ->
+                                viewModel.loadGalleryComments(post.id, sort = "best")
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .background(
+                            if (showComments) Color(0xFF1BB76E).copy(alpha = 0.8f)
+                            else Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(50)
+                        )
+                ) {
+                    Text(
+                        text = "💬",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+                ) {
+                    Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
@@ -723,5 +798,252 @@ fun FullScreenFeedViewer(
                 }
             }
         }
+
+        commentPreviewUrl?.let { rawUrl ->
+            val url = normalizeCommentMediaUrl(rawUrl)
+            Dialog(
+                onDismissRequest = { commentPreviewUrl = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                ) {
+                    if (isDirectCommentVideo(url)) {
+                        ComposeVideoPlayer(
+                            url = url,
+                            isCurrentPage = true,
+                            isFirstItem = true,
+                            autoReplay = autoReplay,
+                            autoPlayVideos = true,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        ZoomableMediaViewer(
+                            url = url,
+                            contentDesc = "Comment media",
+                            isFullScreen = true,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { commentPreviewUrl = null },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(24.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+                    ) {
+                        Text(text = "✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
+}
+
+@Composable
+fun CommentsToggleView(
+    postId: String,
+    postTitle: String,
+    viewModel: MainViewModel,
+    onMediaClick: (String) -> Unit,
+    onExternalLinkClick: (String) -> Unit
+) {
+    val comments = viewModel.commentsCache[postId]
+    val isLoading = viewModel.commentsLoading[postId] == true
+    val error = viewModel.commentsError[postId]
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(horizontal = 16.dp)
+    ) {
+        Text(
+            text = postTitle,
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        Text(
+            text = "💬 Comments (best first)",
+            color = Color(0xFF1BB76E),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        when {
+            isLoading && comments == null -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
+            error != null && comments == null -> {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(text = error, color = Color.LightGray)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = { viewModel.loadGalleryComments(postId, sort = "best", forceRefresh = true) }) {
+                        Text("Retry")
+                    }
+                }
+            }
+            comments.isNullOrEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(text = "No comments yet.", color = Color.Gray)
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(comments, key = { it.id }) { comment ->
+                        CommentThreadItem(
+                            comment = comment,
+                            depth = 0,
+                            onMediaClick = onMediaClick,
+                            onExternalLinkClick = onExternalLinkClick
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CommentThreadItem(
+    comment: ImgurComment,
+    depth: Int,
+    onMediaClick: (String) -> Unit,
+    onExternalLinkClick: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(true) }
+    val childCount = comment.children?.size ?: 0
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 12).dp)
+            .background(
+                color = Color.White.copy(alpha = 0.07f),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "@${comment.author ?: "unknown"}",
+                color = Color(0xFF1BB76E),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "▲ ${comment.points?.toInt() ?: (comment.ups ?: 0)}",
+                color = Color.Gray,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        CommentRichText(
+            text = comment.comment ?: "",
+            onMediaClick = onMediaClick,
+            onExternalLinkClick = onExternalLinkClick
+        )
+        if (childCount > 0) {
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) "Hide $childCount replies" else "Show $childCount replies",
+                    color = Color(0xFF1BB76E),
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+
+    if (expanded && !comment.children.isNullOrEmpty()) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            comment.children.forEach { child ->
+                CommentThreadItem(
+                    comment = child,
+                    depth = depth + 1,
+                    onMediaClick = onMediaClick,
+                    onExternalLinkClick = onExternalLinkClick
+                )
+            }
+        }
+    }
+}
+
+private val MediaUrlRegex = Regex("""https?://[^\s/]*?(imgur\.com|giphy\.com)/\S+""")
+
+internal fun extractMediaUrls(text: String): List<String> =
+    MediaUrlRegex.findAll(text)
+        .map { it.value.trimEnd('.', ',', ')', '!', '?') }
+        .distinct().toList()
+
+private fun isDirectCommentVideo(url: String) =
+    url.endsWith(".mp4", ignoreCase = true) || url.endsWith(".gifv", ignoreCase = true)
+
+private fun isDirectCommentImage(url: String) =
+    listOf(".jpg", ".jpeg", ".png", ".gif", ".webp").any { url.endsWith(it, ignoreCase = true) }
+
+internal fun normalizeCommentMediaUrl(url: String): String =
+    if (url.contains("giphy.com", ignoreCase = true) && url.endsWith(".webp", ignoreCase = true))
+        url.dropLast(".webp".length) + ".mp4"
+    else url
+
+@Composable
+fun CommentRichText(
+    text: String,
+    onMediaClick: (String) -> Unit,
+    onExternalLinkClick: (String) -> Unit
+) {
+    val annotated = remember(text) {
+        buildAnnotatedString {
+            append(text)
+            extractMediaUrls(text).forEach { url ->
+                val start = text.indexOf(url)
+                if (start >= 0) {
+                    addStyle(
+                        style = SpanStyle(
+                            color = Color(0xFF1BB76E),
+                            textDecoration = TextDecoration.Underline
+                        ),
+                        start = start,
+                        end = start + url.length
+                    )
+                    addStringAnnotation(tag = "LINK", annotation = url, start = start, end = start + url.length)
+                }
+            }
+        }
+    }
+    ClickableText(
+        text = annotated,
+        style = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+        onClick = { offset ->
+            annotated.getStringAnnotations(tag = "LINK", start = offset, end = offset)
+                .firstOrNull()?.let { ann ->
+                    val url = ann.item
+                    if (isDirectCommentImage(url) || isDirectCommentVideo(url)) onMediaClick(url)
+                    else onExternalLinkClick(url)
+                }
+        }
+    )
 }

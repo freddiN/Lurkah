@@ -94,6 +94,22 @@ data class ImgurTag(
     val name: String
 )
 
+data class ImgurCommentsResponse(val data: List<ImgurComment>, val success: Boolean)
+
+data class ImgurComment(
+    val id: Long,
+    @SerializedName("image_id") val imageId: String?,
+    val comment: String?,
+    val author: String?,
+    val ups: Int?,
+    val downs: Int?,
+    val points: Double?,
+    val datetime: Long?,
+    @SerializedName("parent_id") val parentId: Long?,
+    val deleted: Boolean?,
+    val children: List<ImgurComment>?
+)
+
 data class ImgurImage(
     val id: String,
     val link: String,
@@ -114,6 +130,13 @@ interface ImgurApiService {
         @Header("Authorization") authHeader: String,
         @Path("id") albumId: String
     ): ImgurAlbumResponse
+
+    @GET("3/gallery/{id}/comments/{sort}")
+    suspend fun getGalleryComments(
+        @Header("Authorization") authHeader: String,
+        @Path("id") galleryId: String,
+        @Path("sort") sort: String = "new"
+    ): ImgurCommentsResponse
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -160,6 +183,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentPage = 0
     val albumImagesCache = mutableStateMapOf<String, List<ImgurImage>>()
+    val commentsCache = mutableStateMapOf<String, List<ImgurComment>>()
+    val commentsLoading = mutableStateMapOf<String, Boolean>()
+    val commentsError = mutableStateMapOf<String, String?>()
 
     init {
         viewModelScope.launch {
@@ -249,6 +275,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+    }
+
+    fun loadGalleryComments(galleryId: String, sort: String = "best", forceRefresh: Boolean = false) {
+        if (commentsLoading[galleryId] == true) return
+        if (!forceRefresh && commentsCache.containsKey(galleryId)) return
+
+        commentsLoading[galleryId] = true
+        commentsError[galleryId] = null
+
+        viewModelScope.launch {
+            try {
+                val response = api.getGalleryComments(authHeader = clientId, galleryId = galleryId, sort = sort)
+                if (response.success) {
+                    commentsCache[galleryId] = response.data
+                    if (commentsCache.size > 50) {
+                        val keysToRemove = commentsCache.keys.take(commentsCache.size - 50)
+                        keysToRemove.forEach { key ->
+                            commentsCache.remove(key)
+                            commentsLoading.remove(key)
+                            commentsError.remove(key)
+                        }
+                    }
+                } else {
+                    commentsError[galleryId] = "Failed to load comments."
+                }
+            } catch (e: HttpException) {
+                e.printStackTrace()
+                commentsError[galleryId] = if (e.code() == 429) {
+                    "Rate limit reached. Please wait a bit before loading comments."
+                } else {
+                    "HTTP Error: ${e.code()} - ${e.message()}"
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                commentsError[galleryId] = "Network error: ${e.localizedMessage ?: "Please check your connection."}"
+            } finally {
+                commentsLoading[galleryId] = false
             }
         }
     }
