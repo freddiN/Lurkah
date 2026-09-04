@@ -990,10 +990,10 @@ fun CommentThreadItem(
     }
 }
 
-private val ImgurUrlRegex = Regex("""https?://(?:i\.)?imgur\.com/\S+""")
+private val MediaUrlRegex = Regex("""https?://(?:(?:i\.)?imgur\.com|(?:media\.|i\.)?giphy\.com|giphy\.com)/\S+""")
 
-private fun extractImgurUrls(text: String): List<String> =
-    ImgurUrlRegex.findAll(text)
+private fun extractMediaUrls(text: String): List<String> =
+    MediaUrlRegex.findAll(text)
         .map { it.value.trimEnd('.', ',', ')', '!', '?') }
         .distinct().toList()
 
@@ -1012,7 +1012,7 @@ fun CommentRichText(
     val annotated = remember(text) {
         buildAnnotatedString {
             append(text)
-            extractImgurUrls(text).forEach { url ->
+            extractMediaUrls(text).forEach { url ->
                 val start = text.indexOf(url)
                 if (start >= 0) {
                     addStyle(
@@ -1023,7 +1023,7 @@ fun CommentRichText(
                         start = start,
                         end = start + url.length
                     )
-                    addStringAnnotation(tag = "IMGUR", annotation = url, start = start, end = start + url.length)
+                    addStringAnnotation(tag = "LINK", annotation = url, start = start, end = start + url.length)
                 }
             }
         }
@@ -1032,7 +1032,7 @@ fun CommentRichText(
         text = annotated,
         style = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
         onClick = { offset ->
-            annotated.getStringAnnotations(tag = "IMGUR", start = offset, end = offset)
+            annotated.getStringAnnotations(tag = "LINK", start = offset, end = offset)
                 .firstOrNull()?.let { ann ->
                     val url = ann.item
                     if (isDirectCommentImage(url) || isDirectCommentVideo(url)) onMediaClick(url)
