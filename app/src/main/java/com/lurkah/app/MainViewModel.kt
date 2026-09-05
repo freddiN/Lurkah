@@ -159,6 +159,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val autoReplay: StateFlow<Boolean> = settingsManager.autoReplay
         .stateIn(viewModelScope, SharingStarted.Lazily, true)
 
+    val overlayButtonsPosition: StateFlow<String> = settingsManager.overlayButtonsPosition
+        .stateIn(viewModelScope, SharingStarted.Lazily, "top_end")
+
     val blacklistedUsers: StateFlow<Set<String>> = settingsManager.blacklistedUsers
         .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
 
@@ -328,6 +331,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleAutoReplay(enabled: Boolean) {
         viewModelScope.launch { settingsManager.setAutoReplay(enabled) }
+    }
+
+    fun setOverlayButtonsPosition(position: String) {
+        viewModelScope.launch { settingsManager.setOverlayButtonsPosition(position) }
     }
 
     fun addBlacklistUser(username: String) {

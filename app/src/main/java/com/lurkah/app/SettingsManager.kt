@@ -3,6 +3,7 @@ package com.lurkah.app
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,7 @@ class SettingsManager(private val context: Context) {
         private val BLACKLISTED_TAGS_KEY = stringSetPreferencesKey("blacklisted_tags")
         private val AUTO_PLAY_VIDEOS_KEY = booleanPreferencesKey("auto_play_videos")
         private val AUTO_REPLAY_KEY = booleanPreferencesKey("auto_replay")
+        private val OVERLAY_BUTTONS_POSITION_KEY = stringPreferencesKey("overlay_buttons_position")
     }
 
     val isDarkMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -38,6 +40,17 @@ class SettingsManager(private val context: Context) {
 
     val autoReplay: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[AUTO_REPLAY_KEY] ?: true
+    }
+
+    val overlayButtonsPosition: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[OVERLAY_BUTTONS_POSITION_KEY] ?: "top_end"
+    }
+
+    suspend fun setOverlayButtonsPosition(position: String) {
+        if (position != "top_end" && position != "bottom_start" && position != "bottom_end") return
+        context.dataStore.edit { preferences ->
+            preferences[OVERLAY_BUTTONS_POSITION_KEY] = position
+        }
     }
 
     suspend fun setAutoPlayVideos(enabled: Boolean) {

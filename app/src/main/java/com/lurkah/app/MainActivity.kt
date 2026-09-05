@@ -141,6 +141,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
     val blacklistedUsers by viewModel.blacklistedUsers.collectAsState()
     val blacklistedTags by viewModel.blacklistedTags.collectAsState()
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
+    val overlayButtonsPosition by viewModel.overlayButtonsPosition.collectAsState()
 
     BackHandler(enabled = currentScreen == "settings") {
         currentScreen = "feed"
@@ -158,6 +159,8 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             onAutoReplayToggle = { viewModel.toggleAutoReplay(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             onRemoveBlacklistTag = { viewModel.removeBlacklistTag(it) },
+            overlayButtonsPosition = overlayButtonsPosition,
+            onOverlayButtonsPositionChange = { viewModel.setOverlayButtonsPosition(it) },
             modifier = Modifier.systemBarsPadding()
         )
     } else {
@@ -493,6 +496,13 @@ fun FullScreenFeedViewer(
         pageCount = { viewModel.posts.size }
     )
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
+    val buttonPosition by viewModel.overlayButtonsPosition.collectAsState()
+    val isBottomButtons = buttonPosition == "bottom_start" || buttonPosition == "bottom_end"
+    val buttonsAlignment = when (buttonPosition) {
+        "bottom_start" -> Alignment.BottomStart
+        "bottom_end" -> Alignment.BottomEnd
+        else -> Alignment.TopEnd
+    }
 
     LaunchedEffect(pagerState.currentPage) {
         gridState.scrollToItem(pagerState.currentPage)
@@ -679,7 +689,7 @@ fun FullScreenFeedViewer(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black)
-                        .padding(top = 88.dp)
+                        .padding(if (isBottomButtons) PaddingValues(bottom = 88.dp) else PaddingValues(top = 88.dp))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -705,7 +715,7 @@ fun FullScreenFeedViewer(
 
             Row(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(buttonsAlignment)
                     .padding(24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
