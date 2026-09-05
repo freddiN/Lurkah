@@ -9,3 +9,4 @@ features:
 - swipe left/right to navigate the feed
 - configure video autoplay (start when opening) and replay (loop)
 - optionally display comments
+- new setting to move the buttons to the bottom 
