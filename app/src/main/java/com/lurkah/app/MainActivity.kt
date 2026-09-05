@@ -991,7 +991,7 @@ fun CommentThreadItem(
     }
 }
 
-private val MediaUrlRegex = Regex("""https?://[^\s/]*?(imgur\.com|giphy\.com)/\S+""")
+private val MediaUrlRegex = Regex("""https?://\S+""")
 
 internal fun extractMediaUrls(text: String): List<String> =
     MediaUrlRegex.findAll(text)
@@ -1003,6 +1003,9 @@ private fun isDirectCommentVideo(url: String) =
 
 private fun isDirectCommentImage(url: String) =
     listOf(".jpg", ".jpeg", ".png", ".gif", ".webp").any { url.endsWith(it, ignoreCase = true) }
+
+private fun isLocalPreviewHost(url: String) =
+    url.contains("imgur.com", ignoreCase = true) || url.contains("giphy.com", ignoreCase = true)
 
 internal fun normalizeCommentMediaUrl(url: String): String =
     if (url.contains("giphy.com", ignoreCase = true) && url.endsWith(".webp", ignoreCase = true))
@@ -1041,7 +1044,7 @@ fun CommentRichText(
             annotated.getStringAnnotations(tag = "LINK", start = offset, end = offset)
                 .firstOrNull()?.let { ann ->
                     val url = ann.item
-                    if (isDirectCommentImage(url) || isDirectCommentVideo(url)) onMediaClick(url)
+                    if (isLocalPreviewHost(url) && (isDirectCommentImage(url) || isDirectCommentVideo(url))) onMediaClick(url)
                     else onExternalLinkClick(url)
                 }
         }

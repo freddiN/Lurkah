@@ -39,4 +39,16 @@ class MediaUrlTest {
             normalizeCommentMediaUrl("https://media.giphy.com/media/a/giphy.gif")
         )
     }
+
+    @Test
+    fun extractsGenericHttpsLink() {
+        val urls = extractMediaUrls("Watch https://www.youtube.com/watch?v=abc123!")
+        assertEquals(listOf("https://www.youtube.com/watch?v=abc123"), urls)
+    }
+
+    @Test
+    fun extractsDirectMediaFromAnyHost() {
+        val urls = extractMediaUrls("pic https://example.com/a.png and https://files.example.org/b.mp4.")
+        assertEquals(listOf("https://example.com/a.png", "https://files.example.org/b.mp4"), urls)
+    }
 }
