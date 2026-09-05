@@ -29,13 +29,17 @@ class SettingsScreenTest {
                 onAutoPlayVideosToggle = {},
                 onAutoReplayToggle = {},
                 onRemoveBlacklistUser = {},
-                onRemoveBlacklistTag = {}
+                onRemoveBlacklistTag = {},
+                overlayButtonsPosition = "top_end",
+                onOverlayButtonsPositionChange = {}
             )
         }
 
         // Überprüfen, ob die statischen Titel aus dem UI-Code gerendert werden
         composeTestRule.onNodeWithText("Dark Mode").assertIsDisplayed()
         composeTestRule.onNodeWithText("Blocked Accounts").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Media Buttons").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Top right").assertIsDisplayed()
 
         // Überprüfen, ob die dynamischen, blockierten Werte korrekt formatiert sind
         composeTestRule.onNodeWithText("@troll_user").assertIsDisplayed()
@@ -57,7 +61,9 @@ class SettingsScreenTest {
                 onAutoPlayVideosToggle = {},
                 onAutoReplayToggle = {},
                 onRemoveBlacklistUser = { removedUser = it },
-                onRemoveBlacklistTag = {}
+                onRemoveBlacklistTag = {},
+                overlayButtonsPosition = "top_end",
+                onOverlayButtonsPositionChange = {}
             )
         }
 
@@ -69,5 +75,32 @@ class SettingsScreenTest {
 
         // Wenn der Klick funktioniert hat, muss unsere Variable den String "troll_account" enthalten
         assertEquals("troll_account", removedUser)
+    }
+
+    @Test
+    fun settingsScreen_clickBottomLeft_triggersCallback() {
+        var selectedPosition: String? = null
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                isDarkMode = true,
+                autoPlayVideos = true,
+                autoReplay = true,
+                blacklistedUsers = emptySet(),
+                blacklistedTags = emptySet(),
+                onDarkModeToggle = {},
+                onAutoPlayVideosToggle = {},
+                onAutoReplayToggle = {},
+                onRemoveBlacklistUser = {},
+                onRemoveBlacklistTag = {},
+                overlayButtonsPosition = "top_end",
+                onOverlayButtonsPositionChange = { selectedPosition = it }
+            )
+        }
+
+        composeTestRule.onNodeWithText("Bottom left").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Bottom left").performClick()
+
+        assertEquals("bottom_start", selectedPosition)
     }
 }
