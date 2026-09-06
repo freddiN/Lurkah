@@ -497,10 +497,10 @@ fun FullScreenFeedViewer(
     )
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
     val buttonPosition by viewModel.overlayButtonsPosition.collectAsState()
-    val isBottomButtons = buttonPosition == "bottom_start" || buttonPosition == "bottom_end"
+    val isBottomButtons = isBottomButtonsPosition(buttonPosition)
     val buttonsAlignment = when (buttonPosition) {
-        "bottom_start" -> Alignment.BottomStart
-        "bottom_end" -> Alignment.BottomEnd
+        OverlayButtonsPosition.BOTTOM_START -> Alignment.BottomStart
+        OverlayButtonsPosition.BOTTOM_END -> Alignment.BottomEnd
         else -> Alignment.TopEnd
     }
 
@@ -1016,6 +1016,9 @@ private fun isDirectCommentImage(url: String) =
 
 private fun isLocalPreviewHost(url: String) =
     url.contains("imgur.com", ignoreCase = true) || url.contains("giphy.com", ignoreCase = true)
+
+internal fun isBottomButtonsPosition(position: String) =
+    position == OverlayButtonsPosition.BOTTOM_START || position == OverlayButtonsPosition.BOTTOM_END
 
 internal fun normalizeCommentMediaUrl(url: String): String =
     if (url.contains("giphy.com", ignoreCase = true) && url.endsWith(".webp", ignoreCase = true))

@@ -99,9 +99,9 @@ fun SettingsScreen(
                 )
 
                 listOf(
-                    "top_end" to "Top right",
-                    "bottom_start" to "Bottom left",
-                    "bottom_end" to "Bottom right"
+                    OverlayButtonsPosition.TOP_END to "Top right",
+                    OverlayButtonsPosition.BOTTOM_START to "Bottom left",
+                    OverlayButtonsPosition.BOTTOM_END to "Bottom right"
                 ).forEach { (value, label) ->
                     Row(
                         modifier = Modifier

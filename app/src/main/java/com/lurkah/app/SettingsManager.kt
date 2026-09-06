@@ -11,6 +11,13 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
+object OverlayButtonsPosition {
+    const val TOP_END = "top_end"
+    const val BOTTOM_START = "bottom_start"
+    const val BOTTOM_END = "bottom_end"
+    val ALL = setOf(TOP_END, BOTTOM_START, BOTTOM_END)
+}
+
 class SettingsManager(private val context: Context) {
 
     companion object {
@@ -43,11 +50,11 @@ class SettingsManager(private val context: Context) {
     }
 
     val overlayButtonsPosition: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[OVERLAY_BUTTONS_POSITION_KEY] ?: "top_end"
+        preferences[OVERLAY_BUTTONS_POSITION_KEY] ?: OverlayButtonsPosition.TOP_END
     }
 
     suspend fun setOverlayButtonsPosition(position: String) {
-        if (position != "top_end" && position != "bottom_start" && position != "bottom_end") return
+        if (position !in OverlayButtonsPosition.ALL) return
         context.dataStore.edit { preferences ->
             preferences[OVERLAY_BUTTONS_POSITION_KEY] = position
         }

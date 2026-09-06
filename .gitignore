@@ -3,4 +3,5 @@
 /build/
 /.gradle/
 /AGENTS.md
+/app/build/
 /local.properties

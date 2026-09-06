@@ -160,7 +160,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Lazily, true)
 
     val overlayButtonsPosition: StateFlow<String> = settingsManager.overlayButtonsPosition
-        .stateIn(viewModelScope, SharingStarted.Lazily, "top_end")
+        .stateIn(viewModelScope, SharingStarted.Lazily, OverlayButtonsPosition.TOP_END)
 
     val blacklistedUsers: StateFlow<Set<String>> = settingsManager.blacklistedUsers
         .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())

@@ -1,4 +1,4 @@
-simple android app to browse imgurs most viral
+simple android app to browse imgur's most viral
 
 features:
 - display media type (image, video, album) and filesize before playing it (looking at you, 175 MB MP4!)
