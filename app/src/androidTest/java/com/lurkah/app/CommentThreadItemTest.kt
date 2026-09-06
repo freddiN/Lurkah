@@ -166,4 +166,29 @@ class CommentThreadItemTest {
 
         assert(externalUrl == "https://giphy.com/gifs/funny-cat-abc123") { "Expected external callback, got $externalUrl" }
     }
+
+    @Test
+    fun commentThread_clickForeignImageLink_triggersExternalCallback() {
+        var mediaUrl: String? = null
+        var externalUrl: String? = null
+        val withLink = ImgurComment(
+            id = 8, imageId = "abc", comment = "Pic https://example.com/photo.jpg here",
+            author = "linker", ups = 1, downs = 0, points = 1.0,
+            datetime = 1, parentId = 0, deleted = false,
+            children = emptyList()
+        )
+
+        composeTestRule.setContent {
+            CommentThreadItem(
+                comment = withLink, depth = 0,
+                onMediaClick = { mediaUrl = it },
+                onExternalLinkClick = { externalUrl = it }
+            )
+        }
+
+        composeTestRule.onNodeWithText("Pic https://example.com/photo.jpg here", substring = true).performClick()
+
+        assert(mediaUrl == null) { "Expected no media callback, got $mediaUrl" }
+        assert(externalUrl == "https://example.com/photo.jpg") { "Expected external callback, got $externalUrl" }
+    }
 }

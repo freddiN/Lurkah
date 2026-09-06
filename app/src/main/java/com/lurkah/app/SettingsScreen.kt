@@ -1,5 +1,6 @@
 package com.lurkah.app
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,8 @@ fun SettingsScreen(
     onAutoReplayToggle: (Boolean) -> Unit,
     onRemoveBlacklistUser: (String) -> Unit,
     onRemoveBlacklistTag: (String) -> Unit,
+    overlayButtonsPosition: String,
+    onOverlayButtonsPositionChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -84,6 +87,34 @@ fun SettingsScreen(
                         )
                     }
                     Switch(checked = autoReplay, onCheckedChange = onAutoReplayToggle)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Media Buttons", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Position of the comment and close buttons",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                listOf(
+                    "top_end" to "Top right",
+                    "bottom_start" to "Bottom left",
+                    "bottom_end" to "Bottom right"
+                ).forEach { (value, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOverlayButtonsPositionChange(value) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = overlayButtonsPosition == value,
+                            onClick = { onOverlayButtonsPositionChange(value) }
+                        )
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))

@@ -141,6 +141,7 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
     val blacklistedUsers by viewModel.blacklistedUsers.collectAsState()
     val blacklistedTags by viewModel.blacklistedTags.collectAsState()
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
+    val overlayButtonsPosition by viewModel.overlayButtonsPosition.collectAsState()
 
     BackHandler(enabled = currentScreen == "settings") {
         currentScreen = "feed"
@@ -158,6 +159,8 @@ fun ImgurAppContent(viewModel: MainViewModel, isDarkMode: Boolean, autoReplay: B
             onAutoReplayToggle = { viewModel.toggleAutoReplay(it) },
             onRemoveBlacklistUser = { viewModel.removeBlacklistUser(it) },
             onRemoveBlacklistTag = { viewModel.removeBlacklistTag(it) },
+            overlayButtonsPosition = overlayButtonsPosition,
+            onOverlayButtonsPositionChange = { viewModel.setOverlayButtonsPosition(it) },
             modifier = Modifier.systemBarsPadding()
         )
     } else {
@@ -493,6 +496,13 @@ fun FullScreenFeedViewer(
         pageCount = { viewModel.posts.size }
     )
     val autoPlayVideos by viewModel.autoPlayVideos.collectAsState()
+    val buttonPosition by viewModel.overlayButtonsPosition.collectAsState()
+    val isBottomButtons = buttonPosition == "bottom_start" || buttonPosition == "bottom_end"
+    val buttonsAlignment = when (buttonPosition) {
+        "bottom_start" -> Alignment.BottomStart
+        "bottom_end" -> Alignment.BottomEnd
+        else -> Alignment.TopEnd
+    }
 
     LaunchedEffect(pagerState.currentPage) {
         gridState.scrollToItem(pagerState.currentPage)
@@ -679,7 +689,7 @@ fun FullScreenFeedViewer(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black)
-                        .padding(top = 88.dp)
+                        .padding(if (isBottomButtons) PaddingValues(bottom = 88.dp) else PaddingValues(top = 88.dp))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -705,7 +715,7 @@ fun FullScreenFeedViewer(
 
             Row(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(buttonsAlignment)
                     .padding(24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -991,7 +1001,7 @@ fun CommentThreadItem(
     }
 }
 
-private val MediaUrlRegex = Regex("""https?://[^\s/]*?(imgur\.com|giphy\.com)/\S+""")
+private val MediaUrlRegex = Regex("""https?://\S+""")
 
 internal fun extractMediaUrls(text: String): List<String> =
     MediaUrlRegex.findAll(text)
@@ -1003,6 +1013,9 @@ private fun isDirectCommentVideo(url: String) =
 
 private fun isDirectCommentImage(url: String) =
     listOf(".jpg", ".jpeg", ".png", ".gif", ".webp").any { url.endsWith(it, ignoreCase = true) }
+
+private fun isLocalPreviewHost(url: String) =
+    url.contains("imgur.com", ignoreCase = true) || url.contains("giphy.com", ignoreCase = true)
 
 internal fun normalizeCommentMediaUrl(url: String): String =
     if (url.contains("giphy.com", ignoreCase = true) && url.endsWith(".webp", ignoreCase = true))
@@ -1041,7 +1054,7 @@ fun CommentRichText(
             annotated.getStringAnnotations(tag = "LINK", start = offset, end = offset)
                 .firstOrNull()?.let { ann ->
                     val url = ann.item
-                    if (isDirectCommentImage(url) || isDirectCommentVideo(url)) onMediaClick(url)
+                    if (isLocalPreviewHost(url) && (isDirectCommentImage(url) || isDirectCommentVideo(url))) onMediaClick(url)
                     else onExternalLinkClick(url)
                 }
         }
